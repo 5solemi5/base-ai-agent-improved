@@ -38,10 +38,11 @@ def runbooks(events: list[dict]) -> list[str]:
             if e.get("type") == "TaskCompleted" and e.get("source") == "runbook"]
 
 
-def flags(reply: str, probed: list[str]) -> list[str]:
+def flags(reply: str, probed: list[str], logs_collected: bool = False) -> list[str]:
     out = [f"조사 안 한 시스템 언급: {s}" for s in dict.fromkeys(SYSTEM_RE.findall(reply))
            if s not in probed]
-    if LOG_CLAIM_RE.search(reply):
+    # [개선 10] 로그 분석 에이전트가 로그를 실제로 수집했다면 "로그 확인 결과 …"는 근거 있는 문장이다
+    if not logs_collected and LOG_CLAIM_RE.search(reply):
         out.append("수집하지 않은 로그 분석 결과 언급")
     return out
 
@@ -57,7 +58,8 @@ def score(case: dict, res: dict) -> dict:
            "cost_usd": meta.get("cost_usd", 0.0), "retry_count": meta.get("retry_count", 0),
            "validation_attempts": meta.get("validation_attempts", 0),
            "probed": probed, "runbooks": rbs, "reply": reply,
-           "approval": res.get("approval_requested", False),
+           # 승인 요청 여부는 저장된 이벤트(ApprovalDecided)에서 읽는다 — --rescore에서도 유지된다
+           "approval": any(e.get("type") == "ApprovalDecided" for e in events),
            "events": events, "metadata": meta}   # 원자료도 저장 → --rescore로 재채점 가능
     if case["route"] == "incident":
         exp = set(case["systems"])
@@ -70,7 +72,8 @@ def score(case: dict, res: dict) -> dict:
             row["unknown_ok"] = not probed and all(u in reply for u in case["unknown"])
             row["flags"] = []
         else:
-            row["flags"] = flags(reply, probed)
+            row["flags"] = flags(reply, probed, logs_collected=any(
+                e.get("type") == "TaskCompleted" and e.get("source") == "log" for e in events))
     if case.get("expect_in_reply"):
         row["reply_ok"] = case["expect_in_reply"] in reply
     return row
@@ -143,7 +146,6 @@ def main():
                                  json={"thread_id": thread, "approved": not args.reject,
                                        "comment": "bench 자동 결정"}, timeout=args.timeout).json()
                 res["events"] = res.get("events") or events_before
-                res["approval_requested"] = True
         except Exception as e:   # 실패도 결과로 남긴다
             res = {"reply": f"[ERROR] {e!r}", "events": [], "metadata": {}}
         res["elapsed_s"] = round(time.perf_counter() - t0, 1)

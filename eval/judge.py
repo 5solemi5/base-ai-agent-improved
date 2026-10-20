@@ -36,7 +36,10 @@ CLAIMS_SCHEMA = {"type": "object", "properties": {"claims": {"type": "array", "i
 
 # 권고문("…점검하세요")은 사실 주장이 아니다 — 프롬프트로 빼라고 해도 8b가 뽑아 와서(실측: 멀쩡한 답 2개를
 # 오판) 코드로 한 번 더 거른다. 문장 끝이 명령·권고형이면 주장에서 제외.
-RECOMMENDATION = re.compile(r"(?:하세요|하십시오|하라|바랍니다|권장합니다|권고합니다|필요합니다)[.!\s]*$")
+RECOMMENDATION = re.compile(r"^추가 확인 필요|(?:하세요|하십시오|하라|바랍니다|권장합니다|권고합니다|필요합니다|필요)[.!\s]*$")
+# 시스템이 덧붙인 안내 줄(✅ 승인 기록, ⛔ 거절 기록, ※ 검증 경고)은 모델이 쓴 주장이 아니다
+SYSTEM_NOTE = re.compile(r"^\s*[✅⛔※].*$", re.M)
+NUMBER = re.compile(r"\d+(?:\.\d+)?")
 SCORE_SYSTEM = ("당신은 운영 보고서 채점자다. '수집된 사실'과 '답변'을 비교해 답변이 사실에 충실한지 "
                 "1~5점으로 채점하라(5=모든 내용이 사실과 일치, 1=사실과 다르거나 지어낸 내용이 많음). "
                 "JSON {score, reason}으로 답하라.")
@@ -81,10 +84,21 @@ class Judge:
         return {"pass": int(out.get("score", 0)) >= 4, "detail": out}
 
     def claims(self, facts: str, answer: str) -> dict:
+        answer = SYSTEM_NOTE.sub("", answer).strip()
         out = self._ask(CLAIMS_SYSTEM, facts, answer, CLAIMS_SCHEMA)
-        bad = [c for c in out.get("claims", []) if not c.get("supported", False)
-               and not RECOMMENDATION.search(c.get("claim", "").strip())]
-        return {"pass": not bad, "detail": bad}
+        answer_numbers = set(NUMBER.findall(answer))
+        bad, misquoted = [], []
+        for c in out.get("claims", []):
+            text = c.get("claim", "").strip()
+            if c.get("supported", False) or RECOMMENDATION.search(text):
+                continue
+            # 채점기가 답변을 잘못 옮겨 적은 경우(실측: 답변의 95%를 93%로 인용) — 답변에 없는 숫자가
+            # 들어간 주장은 '답변의 문제'가 아니라 '채점기의 착오'로 따로 센다
+            if set(NUMBER.findall(text)) - answer_numbers:
+                misquoted.append(c)
+            else:
+                bad.append(c)
+        return {"pass": not bad, "detail": bad, "misquoted": misquoted}
 
 
 def rule(answer: str, collected: list[dict]) -> dict:
@@ -130,9 +144,11 @@ def judge_results(judge: Judge, label: str) -> dict:
         if not facts or "missing" not in r:   # 장애 답변이고 서버가 사실을 돌려준 경우만
             continue
         c = judge.claims(facts, r["reply"])
-        rows.append({"id": r["id"], "pass": c["pass"], "unsupported": c["detail"]})
+        rows.append({"id": r["id"], "pass": c["pass"], "unsupported": c["detail"],
+                     "judge_misquoted": c["misquoted"]})
         print(f"#{r['id']} {'통과' if c['pass'] else '근거 없음 ' + str(len(c['detail'])) + '건'}", flush=True)
-    return {"label": label, "judged": len(rows), "passed": sum(r["pass"] for r in rows), "rows": rows}
+    return {"label": label, "judged": len(rows), "passed": sum(r["pass"] for r in rows),
+            "judge_misquotes": sum(len(r["judge_misquoted"]) for r in rows), "rows": rows}
 
 
 def main():

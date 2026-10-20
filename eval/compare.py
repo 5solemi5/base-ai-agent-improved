@@ -21,6 +21,7 @@ LABELS = [
     ("cost_usd", "가상 비용 합계(USD)"),
     ("retry_total", "재시도 합계"),
     ("validation_attempts_total", "검증 시도 합계"),
+    ("approvals_requested", "위험 조치 승인 요청 수(개선 11)"),
 ]
 
 

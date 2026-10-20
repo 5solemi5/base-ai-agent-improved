@@ -1,0 +1,44 @@
+{
+ "label": "after_ollama_v2",
+ "judged": 5,
+ "passed": 4,
+ "judge_misquotes": 0,
+ "rows": [
+  {
+   "id": 1,
+   "pass": true,
+   "unsupported": [],
+   "judge_misquoted": []
+  },
+  {
+   "id": 2,
+   "pass": true,
+   "unsupported": [],
+   "judge_misquoted": []
+  },
+  {
+   "id": 3,
+   "pass": true,
+   "unsupported": [],
+   "judge_misquoted": []
+  },
+  {
+   "id": 4,
+   "pass": false,
+   "unsupported": [
+    {
+     "claim": "cache-service의 메모리 누수 가능성이 높으며, 힙 사용률 89%에서 eviction이 따라가지 못하는 문제가 발생했으므로, 즉시 재시작을 고려해야 하며, 힙 덤프 분석을 통해 원인을 확인해야 한다.",
+     "supported": false,
+     "evidence": ""
+    }
+   ],
+   "judge_misquoted": []
+  },
+  {
+   "id": 5,
+   "pass": true,
+   "unsupported": [],
+   "judge_misquoted": []
+  }
+ ]
+}
