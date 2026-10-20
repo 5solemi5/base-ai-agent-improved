@@ -24,6 +24,7 @@ import os
 import httpx
 from langsmith import traceable
 
+from .memory import SUMMARIZE_SYSTEM, chat_messages, summarize_prompt
 from .systems import INCIDENT_PATTERN, KNOWN_SYSTEMS, as_bool, normalize_plan
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434/api/chat")
@@ -80,6 +81,7 @@ class OllamaLLM:
     def _usage(self, data: dict) -> dict:
         tokens = (data.get("prompt_eval_count") or 0) + (data.get("eval_count") or 0)
         return {"model": self.name, "tokens": tokens,
+                "prompt_tokens": data.get("prompt_eval_count") or 0,   # [개선 12] 메모리 측정용
                 "usd": round(tokens / 1000 * self.usd_per_1k, 6)}
 
     def _chat(self, system: str, user: str, schema: dict | None = None) -> tuple[str, dict]:
@@ -173,13 +175,17 @@ class OllamaFastLLM(OllamaLLM):
     async def chat(self, query: str, history: list[dict], on_token=None) -> tuple[str, dict]:
         system = ("당신은 운영 인시던트 대응 에이전트의 간결한 한국어 비서다. 한두 문장으로 답하라. "
                   "대화 이력에서 사용자가 밝힌 이름이 있으면 정확히 기억해 답하라. "
-                  "사용자의 이름과 당신 자신을 혼동하지 마라.")
+                  "사용자의 이름과 당신 자신을 혼동하지 마라. "
+                  "'[사용자 정보]'에 적힌 이름·소속은 사용자가 직접 밝힌 확정 사실이다.")
         # [개선 6] 이력을 role이 구분된 messages로 — 최근 10개만(컨텍스트 크기 제한)
-        messages = [{"role": "system", "content": system}]
-        messages += [{"role": m["role"], "content": m["content"]} for m in history[-10:]
-                     if m.get("role") in ("user", "assistant")]
-        messages.append({"role": "user", "content": query})
-        return await self._chat_stream(messages, on_token=on_token)
+        # [개선 12] 대화 요약(system 역할)이 있으면 함께 넣는다 — 10개 창 밖의 사실도 기억
+        return await self._chat_stream(chat_messages(system, history, query), on_token=on_token)
+
+    @traceable(run_type="llm", name="ollama_fast.summarize")
+    def summarize(self, prev_summary: str, messages: list[dict]) -> tuple[str, dict]:
+        """[개선 12] 대화 요약 메모리 — 동기 호출(agent/memory.py가 to_thread로 부른다)."""
+        content, usage = self._chat(SUMMARIZE_SYSTEM, summarize_prompt(prev_summary, messages))
+        return content.strip(), usage
 
 
 class OllamaQualityLLM(OllamaLLM):

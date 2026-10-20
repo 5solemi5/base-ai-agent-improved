@@ -30,6 +30,7 @@ import os
 import httpx
 from langsmith import traceable
 
+from .memory import SUMMARIZE_SYSTEM, chat_messages, summarize_prompt
 from .ollama_llm import build_write_prompt
 from .systems import INCIDENT_PATTERN, KNOWN_SYSTEMS, as_bool, normalize_plan
 
@@ -145,17 +146,22 @@ class OpenAIFastLLM(OpenAILLM):
         전달한다."""
         system = ("당신은 운영 인시던트 대응 에이전트의 간결한 한국어 비서다. 한두 문장으로 답하라. "
                   "대화 이력에서 사용자가 밝힌 이름이 있으면 정확히 기억해 답하라. "
-                  "사용자의 이름과 당신 자신을 혼동하지 마라.")
-        messages = [{"role": "system", "content": system}]
-        messages += [{"role": m["role"], "content": m["content"]} for m in history[-10:]
-                     if m.get("role") in ("user", "assistant")]
-        messages.append({"role": "user", "content": query})
+                  "사용자의 이름과 당신 자신을 혼동하지 마라. "
+                  "'[사용자 정보]'에 적힌 이름·소속은 사용자가 직접 밝힌 확정 사실이다.")
+        messages = chat_messages(system, history, query)   # [개선 12] 요약 + 최근 10개
         user = query
         content, usage = await asyncio.to_thread(self._chat, system, user, False, messages)
         usage["prompt"] = "\n\n".join(f"[{m['role'].upper()}]\n{m['content']}" for m in messages)
         if on_token is not None:
             on_token(content)
         return content, usage
+
+
+    @traceable(run_type="llm", name="openai_fast.summarize")
+    def summarize(self, prev_summary: str, messages: list[dict]) -> tuple[str, dict]:
+        """[개선 12] 대화 요약 메모리 — 동기 호출(agent/memory.py가 to_thread로 부른다)."""
+        content, usage = self._chat(SUMMARIZE_SYSTEM, summarize_prompt(prev_summary, messages))
+        return content.strip(), usage
 
 
 class OpenAIQualityLLM(OpenAILLM):

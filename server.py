@@ -12,6 +12,8 @@
 /chat/stream 도중 예외가 나면 연결을 끊지 않고 Error 이벤트 + [DONE]을 보내며, 응답 metadata에
 개선 지표(조사 대상 출처·미등록 시스템·runbook 선택 방식·근거 문제)를 함께 돌려준다.
 
+[개선 12] 대화 이력은 agent/memory.load_history로 읽는다 — 오래된 턴은 요약본(system 메시지)으로 대체.
+
 [개선 11] Human-in-the-loop: 답변에 위험 조치가 있으면 그래프가 approval 노드에서 멈춘다(interrupt).
   - /chat         → {"status": "pending_approval", "approval": {...}} 로 응답하고 결정을 기다린다
   - /chat/stream  → ApprovalRequired 이벤트를 보내고 스트림을 닫는다
@@ -39,6 +41,7 @@ from agent.deps import SupervisorDeps
 from agent.fake_llm import FastLLM, QualityLLM
 from agent.graph import build_graph
 from agent.mcp_client import MCPClient
+from agent.memory import load_history
 from agent.session_store import SqliteSessionStore
 from agent.supervisor_v1 import run_v1
 
@@ -142,6 +145,7 @@ def _metadata(result: dict, run_id: str | None) -> dict:
                                 if e.get("type") == "RunbookSelected"), None),
         "agents_called": result.get("agents_called", []),   # [개선 10]
         "approval": result.get("approval"),                  # [개선 11]
+        "memory": result.get("memory"),                      # [개선 12] 메시지 수·요약 범위
         "cost_usd": result.get("cost_usd", 0.0),
         "llm_backend": app.state.llm_backend,
         "supervisor_version": app.state.deps.version,
@@ -163,13 +167,15 @@ def _interrupt_payload(result: dict) -> dict | None:
 @traceable(name="chat_request")
 async def _handle_chat(message: str, thread_id: str) -> tuple[dict, str | None]:
     deps = app.state.deps
-    history = deps.session_store.load(thread_id)   # Wave 12
+    # Wave 12 + [개선 12] 오래된 턴은 요약본으로 — 요약이 필요하면 여기서 갱신된다
+    history, memory = await load_history(deps.session_store, deps.fast_llm, thread_id)
     app.state.pending.pop(thread_id, None)   # 승인 대기 중에 새 질문이 오면 이전 대기는 버린다
     if deps.version == "v2":
         run_key = f"{thread_id}:{uuid.uuid4().hex[:8]}"
         result = await app.state.graph.ainvoke(
             {"query": message, "thread_id": thread_id, "history": history,
              "events": [], "cost_usd": 0.0}, config=_run_config(run_key))
+        result = {**result, "memory": memory}
         if _interrupt_payload(result):   # [개선 11] 승인 대기 — 대화 이력은 결정이 난 뒤에 저장
             app.state.pending[thread_id] = {"run_key": run_key, "message": message}
             rt = get_current_run_tree()
@@ -277,7 +283,9 @@ async def chat_stream(message: str, thread_id: str = "default"):
     deps = app.state.deps
 
     async def body():
-        history = deps.session_store.load(thread_id)
+        history, memory = await load_history(deps.session_store, deps.fast_llm, thread_id)
+        if memory["updated"]:   # [개선 12] 요약을 새로 만든 요청이면 화면에 알린다
+            yield _sse({"type": "MemorySummarized", **memory})
         app.state.pending.pop(thread_id, None)
         if deps.version != "v2":
             result = await run_v1(deps, message, thread_id, history)

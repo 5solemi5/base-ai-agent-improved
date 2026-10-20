@@ -75,7 +75,9 @@ class FastLLM(FakeLLM):
         fake 백엔드는 실제 네트워크 호출이 없어 토큰 단위로 쪼갤 대상이 없다 —
         ollama_llm.py와 인터페이스(on_token 콜백)만 맞추고 결과를 한 번에 반환한다."""
         for msg in reversed(history):
-            m = re.search(r"제 이름은 (\S+?)입니다", msg.get("content", ""))
+            # [개선 12] 요약 메모리(system 역할)의 "- 이름: 민수"도 기억의 근거로 본다
+            m = (re.search(r"제 이름은 (\S+?)입니다", msg.get("content", ""))
+                 or re.search(r"^- 이름: (\S+)", msg.get("content", ""), re.M))
             if m and re.search(r"이름이 뭐", query):
                 reply = f"{m.group(1)}님이라고 말씀하셨어요. 무엇을 도와드릴까요?"
                 if on_token is not None:
@@ -89,6 +91,15 @@ class FastLLM(FakeLLM):
         if on_token is not None:
             on_token(reply)
         return reply, self._usage(query, reply)
+
+
+    @traceable(run_type="llm", name="fast_llm.summarize")
+    def summarize(self, prev_summary: str, messages: list[dict]) -> tuple[str, dict]:
+        """[개선 12] 결정론 요약 — 사용자 질문만 최근 5개 남긴다(이름·소속은 memory.py가 코드로 뽑는다)."""
+        lines = [l for l in prev_summary.splitlines() if l.strip()]
+        lines += [f"- 문의: {m['content'][:40]}" for m in messages if m["role"] == "user"]
+        summary = "\n".join(lines[-5:])
+        return summary, self._usage(str(messages), summary)
 
 
 class QualityLLM(FakeLLM):

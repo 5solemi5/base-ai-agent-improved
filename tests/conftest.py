@@ -68,6 +68,12 @@ class MemorySession:
     def append(self, thread_id, role, content):
         self.rows.setdefault(thread_id, []).append({"role": role, "content": content})
 
+    def load_summary(self, thread_id):   # [개선 12]
+        return getattr(self, "summaries", {}).get(thread_id, ("", 0))
+
+    def save_summary(self, thread_id, summary, covered):
+        self.summaries = {**getattr(self, "summaries", {}), thread_id: (summary, covered)}
+
 
 @pytest.fixture
 def stub_mcp():

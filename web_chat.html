@@ -161,6 +161,7 @@ const STEP_LABELS = {
       : '검수 반려 → 다시 작성' + (e.grounding_issues?.length ? ` (근거 문제 ${e.grounding_issues.length}건)` : ''),
   ApprovalSkipped: e => e.risky && !e.hitl ? `위험 조치 ${e.risky}건 (승인 기능 꺼짐 → 그대로 진행)` : null,
   ApprovalDecided: e => e.approved ? '운영자 승인 → 답변 확정' : '운영자 거절 → 위험 조치를 답변에서 제외',
+  MemorySummarized: e => `대화가 길어져 이전 ${e.summarized}개 메시지를 요약해 저장 (모델에는 ${e.sent}개만 전달)`,
   Finalize: () => '최종 답변 완성',
 };
 

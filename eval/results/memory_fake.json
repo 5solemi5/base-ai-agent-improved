@@ -1,0 +1,77 @@
+[
+ {
+  "mode": "window",
+  "recall": "1/2",
+  "avg_prompt_tokens": 0,
+  "rows": [
+   {
+    "question": "제 이름이 뭐였죠?",
+    "reply": "민수님이라고 말씀하셨어요. 무엇을 도와드릴까요?",
+    "ok": true,
+    "prompt_tokens": 0,
+    "chat_s": 0.0,
+    "summarize_s": 0.0,
+    "messages_sent": 26
+   },
+   {
+    "question": "제가 어느 팀이라고 했죠?",
+    "reply": "안녕하세요! 무엇을 도와드릴까요?",
+    "ok": false,
+    "prompt_tokens": 0,
+    "chat_s": 0.0,
+    "summarize_s": 0.0,
+    "messages_sent": 26
+   }
+  ]
+ },
+ {
+  "mode": "full",
+  "recall": "1/2",
+  "avg_prompt_tokens": 0,
+  "rows": [
+   {
+    "question": "제 이름이 뭐였죠?",
+    "reply": "민수님이라고 말씀하셨어요. 무엇을 도와드릴까요?",
+    "ok": true,
+    "prompt_tokens": 0,
+    "chat_s": 0.0,
+    "summarize_s": 0.0,
+    "messages_sent": 26
+   },
+   {
+    "question": "제가 어느 팀이라고 했죠?",
+    "reply": "안녕하세요! 무엇을 도와드릴까요?",
+    "ok": false,
+    "prompt_tokens": 0,
+    "chat_s": 0.0,
+    "summarize_s": 0.0,
+    "messages_sent": 26
+   }
+  ]
+ },
+ {
+  "mode": "summary",
+  "recall": "1/2",
+  "avg_prompt_tokens": 0,
+  "rows": [
+   {
+    "question": "제 이름이 뭐였죠?",
+    "reply": "민수님이라고 말씀하셨어요. 무엇을 도와드릴까요?",
+    "ok": true,
+    "prompt_tokens": 0,
+    "chat_s": 0.0,
+    "summarize_s": 0.0,
+    "messages_sent": 7
+   },
+   {
+    "question": "제가 어느 팀이라고 했죠?",
+    "reply": "안녕하세요! 무엇을 도와드릴까요?",
+    "ok": false,
+    "prompt_tokens": 0,
+    "chat_s": 0.0,
+    "summarize_s": 0.0,
+    "messages_sent": 7
+   }
+  ]
+ }
+]
