@@ -16,7 +16,7 @@ AI 서비스 Mini-Project **과제 1번**. 제공된 Base AI Agent(`all_total_vu
 | 근거 없는 내용이 섞인 답변 | 3 | 0 |
 | RAG incident_type 정확도 (22문항) | 77% | 95% |
 | 37턴 대화 후 이름·소속 기억 / 프롬프트 토큰 | 0/2 (최근 10개만) | 2/2, 328토큰 |
-| 단위 테스트 | 0 | 76 |
+| 단위 테스트 | 0 | 80 |
 
 ## 구조
 
@@ -37,6 +37,7 @@ route ─┬─ chat_answer                         (잡담·대화 기억: 요�
 | 11 Human-in-the-loop 승인 | `agent/approval.py`, `agent/nodes/approval.py` |
 | 12 대화 요약 메모리 | `agent/memory.py` |
 | 13 LLM-as-judge 평가 | `eval/judge.py` |
+| 리뷰 반영: 체크포인트 정리, 승인 대기 유지, 소속 오탐, 채점 필터, 감독자 상한 | `server.py`, `agent/memory.py`, `eval/judge.py`, `agent/research/supervisor.py` |
 
 ## 실행
 

@@ -87,13 +87,16 @@ class Judge:
         answer = SYSTEM_NOTE.sub("", answer).strip()
         out = self._ask(CLAIMS_SYSTEM, facts, answer, CLAIMS_SCHEMA)
         answer_numbers = set(NUMBER.findall(answer))
+        fact_numbers = set(NUMBER.findall(facts))
         bad, misquoted = [], []
         for c in out.get("claims", []):
             text = c.get("claim", "").strip()
             if c.get("supported", False):
                 continue
-            # [리뷰 반영] 권고문이라도 숫자가 들어 있으면 거르지 않는다 — "CPU 97%로 증설이 필요"의 97%는 검사 대상
-            if RECOMMENDATION.search(text) and not NUMBER.search(text):
+            # [리뷰 반영] 권고문이라도 '사실에 없는 숫자'가 들어 있으면 거르지 않는다 — "CPU 97%로 증설이 필요"의
+            # 97%는 검사 대상. 숫자가 모두 사실에 있으면("2100ms 쿼리 추가 확인 필요") 권고문으로 보고 거른다.
+            # (처음엔 '숫자가 하나라도 있으면 검사'로 했더니 실제 답변 5개 중 정상 권고 2개가 걸렸다)
+            if RECOMMENDATION.search(text) and set(NUMBER.findall(text)) <= fact_numbers:
                 continue
             # 채점기가 답변을 잘못 옮겨 적은 경우(실측: 답변의 95%를 93%로 인용) — 답변에 없는 숫자가
             # 들어간 주장은 '답변의 문제'가 아니라 '채점기의 착오'로 따로 센다

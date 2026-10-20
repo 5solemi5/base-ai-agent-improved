@@ -50,3 +50,16 @@ def test_recommendation_with_number_is_still_checked():
 
     out = StubJudge().claims("CPU 91%", "1) CPU 97%로 증설이 필요 2) 헬스체크 점검 필요")
     assert [c["claim"] for c in out["detail"]] == ["CPU 97%로 증설이 필요"]
+
+
+def test_recommendation_with_grounded_number_is_filtered():
+    # 숫자가 모두 사실에 있는 권고문은 거른다 (실제 답변 채점에서 정상 권고 2개가 걸렸던 것)
+    class StubJudge(judge.Judge):
+        def __init__(self):
+            pass
+
+        def _ask(self, system, facts, answer, schema):
+            return {"claims": [{"claim": "slow query 2100ms 추가 확인 필요", "supported": False, "evidence": ""}]}
+
+    out = StubJudge().claims("WARN slow query took 2100ms", "1) slow query 2100ms 추가 확인 필요")
+    assert out["pass"]

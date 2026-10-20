@@ -32,6 +32,7 @@
 | 11 | HITL | runbook의 재시작·롤백·스케일 아웃 같은 위험 조치가 확인 없이 최종 답변에 나감 | 검수를 통과한 답에 위험 조치가 있으면 `interrupt()`로 멈추고, 운영자 승인/거절 후 확정. 거절하면 해당 문장을 제외. API(`/chat/approve`)와 화면 승인 카드 | `agent/approval.py`, `agent/nodes/approval.py`, `server.py`, `web_chat.html` |
 | 12 | 메모리 | 최근 10개 메시지만 전달 → 5턴 전에 말한 이름·소속을 잊음. 창을 늘리면 프롬프트가 계속 커짐 | 오래된 턴을 요약해 session.db에 저장(이름·소속은 코드가 정규식으로 고정, 나머지는 LLM 요약, 5줄 상한) | `agent/memory.py`, `agent/session_store.py` |
 | 13 | 평가 | 키워드 규칙 평가만 있음. "수치를 정확히 인용했는가"를 판단할 수단이 없음 | LLM-as-judge 2종(1~5점 / 주장별 근거 확인)을 정답 라벨 12건으로 먼저 검증한 뒤, 실제 답변 채점에 사용 | `eval/judge.py`, `eval/judge_cases.json` |
+| 14 | 리뷰 | 9~13 코드 재검토에서 발견: ① 요청마다 체크포인트가 쌓여 메모리 누수 ② 재개 실패 시 승인 대기 유실 ③ "인프라팀에서 연락 왔어요"를 소속으로 저장 ④ 숫자가 든 권고문이 채점을 피함 ⑤ 감독자 호출 상한 없음 | 끝난 요청의 체크포인트 삭제, 성공 후에만 대기 삭제, 소속 표현 좁힘, 숫자 있으면 검사, 3회 하드 상한 + 회귀 테스트 | `server.py`, `agent/memory.py`, `eval/judge.py`, `agent/research/supervisor.py` |
 
 ## 2. Before / After (같은 9개 질문, `eval/bench.py`)
 
@@ -76,8 +77,8 @@
 | 채점기 | qwen3:8b 정확도 | qwen3:0.6b 정확도 | 비고 |
 |---|---|---|---|
 | rule (개선 4의 규칙 검사) | 8/12 (문제 4/8 잡음, 오판 0) | 8/12 | 수치 없는 틀린 추론·상태 모순은 못 잡음 |
-| score (1~5점) | 12/12 | 9/12 (멀쩡한 답 3개 오판) | 8b 기준 충실한 답 최저 4점 = 합격선 4점, 여유가 1점뿐. 답변당 5.9초 |
-| claims (주장별 근거 확인) | 12/12 | 10/12 | 어떤 주장이 왜 틀렸는지 근거를 남김. 답변당 11.8초 |
+| score (1~5점) | 12/12 | 9/12 (멀쩡한 답 3개 오판) | 8b 기준 충실한 답 최저 4점 = 합격선 4점, 여유가 1점뿐. 답변당 5.6초 |
+| claims (주장별 근거 확인) | 12/12 | 10/12 | 어떤 주장이 왜 틀렸는지 근거를 남김. 답변당 11.1초 |
 | rule + claims | 12/12 | 11/12 | 작은 모델에서 가장 안정적 |
 
 실제 After 답변 5개를 claims(8b)로 채점한 결과(`eval/results/judge_after_ollama_v2.json`)는 4개 통과, 1개 지적이다. 지적된 1개는 "메모리 누수 가능성이 높다"는 추론으로, 사실(메모리 89%, 꾸준히 증가)에서 유추는 되지만 직접 적혀 있지는 않다.
@@ -110,7 +111,7 @@
 
 ```bash
 bash sh/setup_venv.sh && .venv/bin/python3 -m pip install -r requirements-dev.txt
-.venv/bin/python3 -m pytest -q                         # 76 passed
+.venv/bin/python3 -m pytest -q                         # 80 passed
 .venv/bin/python3 eval/rag_eval.py                      # RAG 정확도
 .venv/bin/python3 eval/memory_eval.py --backend ollama  # 요약 메모리
 .venv/bin/python3 eval/judge.py                         # LLM-as-judge 검증 (qwen3:8b)
