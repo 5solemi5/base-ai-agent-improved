@@ -29,24 +29,25 @@ command -v ollama >/dev/null 2>&1 \
 
 echo "대상 모델: fast=$FAST_MODEL / quality=$QUALITY_MODEL"
 
-# ── 1) 기존 ollama serve 내리기 ─────────────────────────────────────────
+# ── 1~2) ollama serve 확보 ──────────────────────────────────────────────
+# [개선 5] 원본은 이미 떠 있는 ollama serve(Ollama 앱 포함)를 kill -9 하고 임시 serve를 띄운 뒤,
+# 끝날 때 그것마저 kill해서 스크립트가 끝나면 Ollama가 꺼진 상태가 됐다.
+# 여기서는 떠 있으면 그대로 쓰고, 없을 때만 임시로 띄웠다가 '내가 띄운 것만' 끈다.
+STARTED_PID=""
 if curl -s --max-time 2 http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
-    echo "기존 ollama serve가 떠 있어 종료합니다..."
-    lsof -ti:11434 | xargs kill -9 2>/dev/null || true
-    for _ in $(seq 1 20); do
-        curl -s --max-time 1 http://127.0.0.1:11434/api/tags >/dev/null 2>&1 || break
-        sleep 0.5
-    done
+    echo "이미 떠 있는 ollama serve를 그대로 사용합니다."
+else
+    echo "ollama serve가 없어 임시로 띄웁니다..."
+    nohup ollama serve > /tmp/all_total_vue_ollama_setup.log 2>&1 &
+    STARTED_PID=$!
 fi
 
-# ── 2) 모델 확인/구성을 위해 ollama serve 임시 기동 ─────────────────────
-echo "모델 확인을 위해 ollama serve를 임시로 띄웁니다..."
-nohup ollama serve > /tmp/all_total_vue_ollama_setup.log 2>&1 &
-
 cleanup() {
-    echo
-    echo "임시로 띄운 ollama serve를 종료합니다..."
-    lsof -ti:11434 | xargs kill -9 2>/dev/null || true
+    if [ -n "$STARTED_PID" ]; then
+        echo
+        echo "임시로 띄운 ollama serve를 종료합니다..."
+        kill "$STARTED_PID" 2>/dev/null || true
+    fi
 }
 trap cleanup EXIT
 

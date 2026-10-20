@@ -11,6 +11,8 @@
 #
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source sh/_common.sh   # [개선 5] free_port: 우리 서버일 때만 종료
+BACKEND_PORT="${BACKEND_PORT:-8100}"; export BACKEND_PORT
 
 # 이 머신은 plain python3/python이 alias로 다른 경로를 가리켜 venv를 무시하는
 # 경우가 있어, 이 프로젝트 전용 .venv가 있으면 PATH 맨 앞에 명시적으로 꽂아둔다.
@@ -27,8 +29,9 @@ if [ ! -f .env ]; then
 fi
 set -a; source .env; set +a
 export LANGCHAIN_PROJECT="capstone-all-total-ollama"   # fake 모드와 프로젝트 분리
+export OLLAMA_FAST_MODEL="$FAST_MODEL" OLLAMA_QUALITY_MODEL="$QUALITY_MODEL"   # server.py도 같은 모델을 쓰게
 echo "LangSmith: project=$LANGCHAIN_PROJECT tracing=${LANGCHAIN_TRACING_V2:-}"
-echo "모델: fast=$FAST_MODEL / quality=$QUALITY_MODEL"
+echo "모델: fast=$FAST_MODEL / quality=$QUALITY_MODEL / thinking=${OLLAMA_THINK:-0} (1이면 켬)"
 
 # ── 1) Ollama 데몬 확인 (없으면 기동) ──────────────────────────────────
 STARTED_OLLAMA=""
@@ -57,14 +60,15 @@ for m in "$FAST_MODEL" "$QUALITY_MODEL"; do
 done
 
 # ── 2) 이전 실행 정리 ──────────────────────────────────────────────────
-lsof -ti:8100 | xargs kill -9 2>/dev/null || true
-rm -f session.db
+free_port "$BACKEND_PORT" "server\.py"
+# [개선 5] 원본은 기동할 때마다 session.db를 지워 "재시작해도 대화 기억"이 깨졌다 — 원할 때만 초기화
+if [ "${RESET_SESSION:-0}" = "1" ]; then rm -f session.db; echo "session.db 초기화 (RESET_SESSION=1)"; fi
 
 cleanup() {
     echo
     echo "에이전트를 종료합니다..."
-    lsof -ti:8100 | xargs kill -9 2>/dev/null || true
-    [ -n "$STARTED_OLLAMA" ] && kill "$STARTED_OLLAMA" 2>/dev/null || true
+    [ -n "${SERVER_PID:-}" ] && kill "$SERVER_PID" 2>/dev/null || true   # 내가 띄운 서버만
+    if [ -n "$STARTED_OLLAMA" ]; then kill "$STARTED_OLLAMA" 2>/dev/null || true; fi
 }
 trap cleanup EXIT
 
@@ -72,28 +76,28 @@ trap cleanup EXIT
 LLM_BACKEND=ollama SUPERVISOR_VERSION=v2 python3 server.py &
 SERVER_PID=$!
 for _ in $(seq 1 40); do
-    curl -s http://127.0.0.1:8100/health >/dev/null 2>&1 && break
+    curl -s "http://127.0.0.1:$BACKEND_PORT/health" >/dev/null 2>&1 && break
     sleep 0.5
 done
 
 echo
-curl -s http://127.0.0.1:8100/health | python3 -m json.tool --no-ensure-ascii
+curl -s "http://127.0.0.1:$BACKEND_PORT/health" | python3 -m json.tool --no-ensure-ascii
 
 cat <<EOF
 
 ################################################################
- 에이전트가 떠 있습니다 (http://127.0.0.1:8100, LLM_BACKEND=ollama)
+ 에이전트가 떠 있습니다 (http://127.0.0.1:$BACKEND_PORT, LLM_BACKEND=ollama)
 ################################################################
 
 지금 바로 테스트해볼 수 있는 방법:
 
 1) curl로 말 걸어보기
-   curl -s -X POST localhost:8100/chat -H 'Content-Type: application/json' \\
+   curl -s -X POST localhost:$BACKEND_PORT/chat -H 'Content-Type: application/json' \\
      -d '{"message":"auth-service 로그인 응답이 느려졌어요. 원인 확인해주세요","thread_id":"t-test"}' \\
      | python3 -m json.tool --no-ensure-ascii
 
 2) 실시간 진행 상황 보기 (스트리밍)
-   curl -sN -G "localhost:8100/chat/stream" \\
+   curl -sN -G "localhost:$BACKEND_PORT/chat/stream" \\
      --data-urlencode "message=web-01 CPU 급증 원인 진단해줘" \\
      --data-urlencode "thread_id=t-test-sse"
 

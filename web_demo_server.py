@@ -12,6 +12,7 @@ server.py는 평소처럼(fake/ollama/openai 아무 백엔드로나) 8100에 미
 실행:
     python3 web_demo_server.py        # http://localhost:8600 에서 채팅 화면 오픈
 """
+import os
 from pathlib import Path
 
 import httpx
@@ -19,7 +20,9 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
-BACKEND = "http://127.0.0.1:8100"
+# [개선 5] 백엔드 주소·프론트 포트를 환경변수로 (원본은 8100/8600 하드코딩)
+BACKEND = os.environ.get("BACKEND_URL", f"http://127.0.0.1:{os.environ.get('BACKEND_PORT', '8100')}")
+FRONT_PORT = int(os.environ.get("FRONT_PORT", "8600"))
 HERE = Path(__file__).parent
 
 app = FastAPI()
@@ -27,7 +30,8 @@ app = FastAPI()
 
 @app.get("/")
 async def index():
-    return FileResponse(HERE / "web_chat.html")
+    # 수정한 HTML이 브라우저 캐시 때문에 반영 안 되던 문제 방지
+    return FileResponse(HERE / "web_chat.html", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/health")
@@ -40,7 +44,7 @@ async def proxy_health():
 @app.post("/chat")
 async def proxy_chat(req: Request):
     body = await req.body()
-    async with httpx.AsyncClient(timeout=120.0) as client:
+    async with httpx.AsyncClient(timeout=600.0) as client:   # 실모델 장애 진단은 100초 가까이 걸릴 수 있다
         r = await client.post(f"{BACKEND}/chat", content=body,
                               headers={"content-type": "application/json"})
     return JSONResponse(r.json(), status_code=r.status_code)
@@ -61,5 +65,6 @@ async def proxy_stream(message: str, thread_id: str = "web-demo"):
 
 
 if __name__ == "__main__":
-    print("브라우저에서 http://localhost:8600 을 열어보세요 (server.py가 8100에 떠 있어야 합니다)")
-    uvicorn.run(app, host="0.0.0.0", port=8600)
+    print(f"브라우저에서 http://localhost:{FRONT_PORT} 을 열어보세요 (백엔드: {BACKEND})")
+    # 0.0.0.0이면 같은 네트워크의 다른 기기에서도 접속된다 — 데모 PC 밖으로 열 이유가 없어 127.0.0.1로
+    uvicorn.run(app, host="127.0.0.1", port=FRONT_PORT)

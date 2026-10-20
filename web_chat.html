@@ -87,7 +87,7 @@
       </div>
 
       <div v-else-if="item.kind === 'steps'" class="steps">
-        <div v-for="(step, i) in item.steps" :key="i" class="step">{{ step }}</div>
+        <div v-for="(step, i) in item.steps" :key="i" class="step" :class="{ done: item.done }">{{ step }}</div>
       </div>
 
       <div v-else-if="item.kind === 'agent'" class="row agent">
@@ -110,7 +110,8 @@
   </form>
 </div>
 
-<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<!-- [개선 5] 버전 고정: vue@3는 배포 시점마다 다른 버전이 내려온다 -->
+<script src="https://unpkg.com/vue@3.4.38/dist/vue.global.prod.js"></script>
 <script>
 const { createApp, ref, reactive, nextTick } = Vue;
 
@@ -120,9 +121,12 @@ const STEP_LABELS = {
   TaskCompleted: e => (e.source === 'monitoring'
       ? `모니터링 지표 확인 (시스템: ${e.target})`
       : `대응 매뉴얼(runbook) 조회 (장애유형: ${e.target})`) + (e.retries ? ' (재시도 성공)' : ''),
-  ReplanCheck: e => e.is_sufficient ? null : `정보 부족 → 장애유형 "${e.target}"로 추가 조사`,
+  ReplanCheck: e => e.is_sufficient ? null : `정보 부족 → 장애유형 "${e.target}"로 추가 조사` + (e.method ? ` (${e.method} 검색)` : ''),
   DraftWritten: e => `답변 초안 작성 (시도 ${e.attempt})`,
-  Validation: e => e.verdict === '합격' ? '검수 통과' : '검수 반려 → 다시 작성',
+  // [개선 5] 원본은 '합격(최대 시도 도달 — 통과 처리)'도 '검수 반려'로 표시했다
+  Validation: e => e.verdict === '합격' ? '검수 통과'
+      : e.verdict.startsWith('합격') ? '검수 최대 횟수 도달 → 경고와 함께 통과'
+      : '검수 반려 → 다시 작성' + (e.grounding_issues?.length ? ` (근거 문제 ${e.grounding_issues.length}건)` : ''),
   Finalize: () => '최종 답변 완성',
 };
 
@@ -133,7 +137,13 @@ createApp({
     const input = ref('');
     const sending = ref(false);
     const logEl = ref(null);
-    const thread = 't-web-' + Math.random().toString(36).slice(2, 8);
+    // [개선 5] 새로고침해도 같은 대화를 이어가도록 thread_id를 브라우저에 보관 (원본은 매번 새로 생성)
+    let thread = null;
+    try { thread = localStorage.getItem('agent_thread_id'); } catch {}
+    if (!thread) {
+      thread = 't-web-' + Math.random().toString(36).slice(2, 8);
+      try { localStorage.setItem('agent_thread_id', thread); } catch {}
+    }
     let nextId = 0;
 
     fetch('/health').then(r => r.json()).then(h => {
@@ -154,7 +164,7 @@ createApp({
       sending.value = true;
       scrollToBottom();
 
-      const stepsItem = reactive({ id: nextId++, kind: 'steps', steps: [] });
+      const stepsItem = reactive({ id: nextId++, kind: 'steps', steps: [], done: false });
       log.value.push(stepsItem);
       scrollToBottom();
 
@@ -164,7 +174,11 @@ createApp({
       let streamAttempt = null;   // write_node 재작성(attempt 증가) 시 새 말풍선으로 끊는다
 
       es.onmessage = (event) => {
-        if (event.data === '[DONE]') { es.close(); sending.value = false; return; }
+        if (event.data === '[DONE]') {
+          es.close(); sending.value = false;
+          stepsItem.done = true;   // [개선 5] 끝난 단계를 ✓로 바꾼다(원본 CSS에 .done이 있었지만 쓰이지 않았다)
+          return;
+        }
         let e;
         try { e = JSON.parse(event.data); } catch { return; }
 
@@ -175,6 +189,12 @@ createApp({
             streamAttempt = e.attempt;
           }
           streamItem.text += e.delta;
+          scrollToBottom();
+          return;
+        }
+
+        if (e.type === 'Error') {   // [개선 5] 서버 오류를 화면에 보여준다(원본은 아무 표시 없이 멈춤)
+          log.value.push({ id: nextId++, kind: 'agent', text: '⚠️ 처리 중 오류: ' + e.message });
           scrollToBottom();
           return;
         }
@@ -200,7 +220,14 @@ createApp({
         scrollToBottom();
       };
 
-      es.onerror = () => { es.close(); sending.value = false; };
+      es.onerror = () => {
+        es.close();
+        if (sending.value) {   // [DONE] 전에 끊겼다면 = 백엔드가 꺼졌거나 프록시 오류
+          log.value.push({ id: nextId++, kind: 'agent', text: '⚠️ 서버와 연결이 끊겼습니다. 백엔드가 떠 있는지 확인하세요.' });
+          scrollToBottom();
+        }
+        sending.value = false;
+      };
     }
 
     return { backendLabel, log, input, sending, logEl, onSubmit };

@@ -18,14 +18,16 @@
 #
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source sh/_common.sh   # [개선 5]
+BACKEND_PORT="${BACKEND_PORT:-8100}"; FRONT_PORT="${FRONT_PORT:-8600}"; export BACKEND_PORT FRONT_PORT
 
 # 이 머신은 plain python3/python이 alias로 다른 경로를 가리켜 venv를 무시하는
 # 경우가 있어, 이 프로젝트 전용 .venv가 있으면 PATH 맨 앞에 명시적으로 꽂아둔다.
 [ -x ".venv/bin/python3" ] && export PATH="$PWD/.venv/bin:$PATH"
 
 # ── 0) 백엔드(8100)가 먼저 떠 있는지 확인 ───────────────────────────────
-if ! curl -s --max-time 2 http://127.0.0.1:8100/health >/dev/null 2>&1; then
-    echo "ERROR: 백엔드(http://127.0.0.1:8100)가 응답하지 않습니다."
+if ! curl -s --max-time 2 "http://127.0.0.1:$BACKEND_PORT/health" >/dev/null 2>&1; then
+    echo "ERROR: 백엔드(http://127.0.0.1:$BACKEND_PORT)가 응답하지 않습니다."
     echo "  먼저 다른 터미널에서 아래 중 하나로 백엔드를 띄우세요:"
     echo "    ./sh/run_agent_openai.sh   (실제 OpenAI API, 과금)"
     echo "    ./sh/run_agent_ollma.sh    (로컬 Ollama)"
@@ -34,12 +36,12 @@ if ! curl -s --max-time 2 http://127.0.0.1:8100/health >/dev/null 2>&1; then
 fi
 
 # ── 1) 이전 실행 정리 ──────────────────────────────────────────────────
-lsof -ti:8600 | xargs kill -9 2>/dev/null || true
+free_port "$FRONT_PORT" "web_demo_server\.py"
 
 cleanup() {
     echo
     echo "프론트엔드(web_demo_server.py)를 종료합니다..."
-    lsof -ti:8600 | xargs kill -9 2>/dev/null || true
+    [ -n "${SERVER_PID:-}" ] && kill "$SERVER_PID" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -47,18 +49,18 @@ trap cleanup EXIT
 python3 web_demo_server.py &
 SERVER_PID=$!
 for _ in $(seq 1 40); do
-    curl -s http://127.0.0.1:8600/health >/dev/null 2>&1 && break
+    curl -s "http://127.0.0.1:$FRONT_PORT/health" >/dev/null 2>&1 && break
     sleep 0.5
 done
 
 cat <<EOF
 
 ################################################################
- 프론트엔드가 떠 있습니다 → http://localhost:8600
- (web_chat.html을 띄우고 /chat·/chat/stream을 백엔드 8100으로 프록시)
+ 프론트엔드가 떠 있습니다 → http://localhost:$FRONT_PORT
+ (web_chat.html을 띄우고 /chat·/chat/stream을 백엔드 ${BACKEND_PORT}으로 프록시)
 ################################################################
 
-브라우저에서 http://localhost:8600 접속해 바로 채팅해볼 수 있습니다.
+브라우저에서 http://localhost:$FRONT_PORT 접속해 바로 채팅해볼 수 있습니다.
 종료하려면 이 터미널에서 Ctrl+C.
 EOF
 

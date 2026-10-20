@@ -7,6 +7,10 @@
 - Wave 12 : 대화 이력을 SQLite(session.db)에 저장 — 재시작해도 유지
 - Wave 14 : SUPERVISOR_VERSION(v1/v2) 환경변수로 legacy/신형 파이프라인 즉시 전환
 - LangSmith: 요청당 chat_request 루트 run 아래로 노드·LLM·MCP 호출이 계층 기록됨
+
+[개선 5] 포트를 BACKEND_PORT 환경변수로(기본 8100 — 다른 프로그램이 8100을 쓰면 바꿔서 기동),
+/chat/stream 도중 예외가 나면 연결을 끊지 않고 Error 이벤트 + [DONE]을 보내며, 응답 metadata에
+개선 지표(조사 대상 출처·미등록 시스템·runbook 선택 방식·근거 문제)를 함께 돌려준다.
 """
 import json
 import os
@@ -114,6 +118,10 @@ def _metadata(result: dict, run_id: str | None) -> dict:
         "retry_count": result.get("retry_count", 0),
         "parallel_elapsed": result.get("parallel_elapsed"),
         "validation_attempts": result.get("validation_attempts", 0),
+        "unknown_systems": result.get("unknown_systems", []),
+        "grounding_issues": result.get("grounding_issues", []),
+        "runbook_method": next((e.get("method") for e in result.get("events", [])
+                                if e.get("type") == "ReplanCheck" and e.get("method")), None),
         "cost_usd": result.get("cost_usd", 0.0),
         "llm_backend": app.state.llm_backend,
         "supervisor_version": app.state.deps.version,
@@ -155,12 +163,23 @@ async def chat_stream(message: str, thread_id: str = "default"):
     deps = app.state.deps
 
     async def gen():
+        try:
+            async for chunk in _stream_body():
+                yield chunk
+        except Exception as e:   # [개선 5] 원본은 여기서 연결이 그냥 끊겨 화면이 영원히 ⏳ 상태였다
+            err = {"type": "Error", "message": f"{type(e).__name__}: {e}"}
+            yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
+        yield "data: [DONE]\n\n"
+
+    async def _stream_body():
         history = deps.session_store.load(thread_id)
         if deps.version != "v2":
             result = await run_v1(deps, message, thread_id, history)
             for ev in result["events"]:
                 yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'type': 'FinalAnswer', 'reply': result['final']}, ensure_ascii=False)}\n\n"
+            deps.session_store.append(thread_id, "user", message)   # 원본 v1 스트림은 저장을 빠뜨렸다
+            deps.session_store.append(thread_id, "assistant", result["final"])
         else:
             seen = 0
             final = ""
@@ -187,11 +206,11 @@ async def chat_stream(message: str, thread_id: str = "default"):
             yield f"data: {json.dumps({'type': 'FinalAnswer', 'reply': final, 'prompt': last_prompt}, ensure_ascii=False)}\n\n"
             deps.session_store.append(thread_id, "user", message)
             deps.session_store.append(thread_id, "assistant", final)
-        yield "data: [DONE]\n\n"
 
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8100, log_level="warning")
+    uvicorn.run(app, host="127.0.0.1", port=int(os.environ.get("BACKEND_PORT", "8100")),
+                log_level="warning")
