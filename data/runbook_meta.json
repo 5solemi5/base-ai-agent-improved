@@ -1,0 +1,9 @@
+{
+  "_설명": "runbook 검색(RAG)용 메타데이터. 각 incident_type 문서에 붙는 대표 증상 표현(한국어·영어). runbook 본문과 함께 벡터화되어 검색 대상이 된다.",
+  "cpu-spike": ["CPU 사용률 급증", "CPU가 치솟음", "CPU high", "cpu usage over threshold", "부하 급증", "인스턴스 응답 느림", "instance responding slow", "트래픽 폭증"],
+  "memory-leak": ["메모리 사용률 계속 증가", "메모리 누수", "memory usage climbing", "heap near limit", "OOM", "힙 부족", "GC 증가"],
+  "high-latency": ["응답 지연", "응답이 느림", "p95 latency", "커넥션 풀 고갈", "connection pool used", "로그인 느림", "slow query", "지연시간 임계치 초과"],
+  "network-timeout": ["요청 타임아웃", "upstream timeout", "504 Gateway Timeout", "packet loss", "패킷 손실", "서비스 간 호출 실패", "DNS 실패", "연결 시간 초과"],
+  "disk-full": ["디스크 공간 부족", "disk usage", "disk space low", "로그 파일 과다", "볼륨 가득 참", "/var/log 사용률"],
+  "db-down": ["데이터베이스 다운", "DB 연결 불가", "database down", "replication 중단", "failover", "DB 커넥션 거부"]
+}
