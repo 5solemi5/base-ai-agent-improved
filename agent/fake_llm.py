@@ -8,6 +8,8 @@ import re
 
 from langsmith import traceable
 
+from .systems import INCIDENT_PATTERN
+
 
 class FakeLLM:
     def __init__(self, name: str, usd_per_1k_tokens: float):
@@ -26,7 +28,9 @@ class FastLLM(FakeLLM):
     @traceable(run_type="llm", name="fast_llm.route")
     def route(self, query: str) -> tuple[dict, dict]:
         """Wave 5 — 쿼리 라우팅. 장애 관련이면 incident 파이프라인, 아니면 chat 직행."""
-        incident = bool(re.search(r"장애|진단|다운|지연|급증|incident|티켓", query))
+        # [개선 2] 원본 정규식은 "느려/타임아웃/저하/치솟"을 몰라 장애 쿼리 6개 중 5개를 chat으로 보냈다.
+        # ollama/openai의 JSON 파싱 실패 폴백과 같은 패턴(agent/systems.py)을 공유한다.
+        incident = bool(INCIDENT_PATTERN.search(query))
         result = {"route": "incident" if incident else "chat", "needs_analysis": False}
         return result, self._usage(query, str(result))
 

@@ -8,6 +8,7 @@ from langsmith import traceable
 
 from .deps import SupervisorDeps
 from .retry import with_retry
+from .systems import INCIDENT_PATTERN
 
 
 @traceable(name="supervisor_v1_legacy")
@@ -16,7 +17,9 @@ async def run_v1(deps: SupervisorDeps, query: str, thread_id: str,
     events = [{"type": "Legacy", "note": "v1: 라우팅/게이트/재계획/검증 없음"}]
     # 이름 기억 같은 단순 대화도, 장애 진단도 전부 같은 선형 경로를 탄다.
     reply, usage = await deps.fast_llm.chat(query, history)
-    if "도와드릴까요" in reply and ("장애" in query or "진단" in query):
+    # [개선] 원본 조건은 fake 응답 문구("도와드릴까요")에 의존해 실모델에서는 한 번도 조사하지
+    # 않았다(실측: 질문을 그대로 되풀이). 롤백 대상이 실제로 동작하도록 질문 자체로 판정한다.
+    if INCIDENT_PATTERN.search(query):
         data, retries = await with_retry(
             deps.mcp.call_tool, "get_monitoring_status", {"system_name": "auth-service"})
         reply = (f"{data['system_name']} 상태={data['status']}, "
