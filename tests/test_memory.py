@@ -62,3 +62,10 @@ def test_profile_pinned_by_code_and_round_trips():
     assert profile == {"이름": "민수", "소속": "인프라팀"}
     text = compose_summary(profile, "- 문의: payments CPU")
     assert parse_summary(text) == (profile, "- 문의: payments CPU")
+
+
+def test_other_team_mention_is_not_my_team():
+    # [리뷰 반영] 남의 팀 언급이 내 소속을 덮어쓰면 안 된다
+    msgs = [{"role": "user", "content": "결제팀에서 일해요"},
+            {"role": "user", "content": "인프라팀에서 연락 왔어요"}]
+    assert extract_profile(msgs) == {"소속": "결제팀"}

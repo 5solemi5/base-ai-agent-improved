@@ -182,6 +182,7 @@ async def _handle_chat(message: str, thread_id: str) -> tuple[dict, str | None]:
             app.state.pending[thread_id] = {"run_key": run_key, "message": message}
             rt = get_current_run_tree()
             return result, (str(rt.id) if rt else None)
+        _finish_run(thread_id, run_key)
     else:
         result = await run_v1(deps, message, thread_id, history)   # Wave 14
     deps.session_store.append(thread_id, "user", message)
@@ -206,20 +207,33 @@ async def chat(req: ChatRequest):
     return _chat_response(result, run_id)
 
 
-def _take_pending(thread_id: str) -> dict:
-    pending = app.state.pending.pop(thread_id, None)
+def _get_pending(thread_id: str) -> dict:
+    """[리뷰 반영] 꺼내지(pop) 않고 보기만 한다 — 재개 중 예외가 나도 승인 대기가 사라지지 않아 다시 시도할 수 있다.
+    재개가 끝까지 성공한 뒤에 _finish_run이 지운다."""
+    pending = app.state.pending.get(thread_id)
     if pending is None:
         raise HTTPException(404, f"승인 대기 중인 요청이 없습니다: thread_id={thread_id}")
     return pending
 
 
+def _finish_run(thread_id: str, run_key: str) -> None:
+    """[리뷰 반영] 끝난 요청의 체크포인트를 지운다. 요청마다 새 run_key로 저장하므로, 지우지 않으면
+    InMemorySaver가 요청 수만큼 계속 커진다. 승인 대기 중인 요청은 재개해야 하므로 지우지 않는다."""
+    if app.state.pending.get(thread_id, {}).get("run_key") == run_key:
+        app.state.pending.pop(thread_id, None)
+    checkpointer = app.state.graph.checkpointer if app.state.graph is not None else None
+    if checkpointer is not None:
+        checkpointer.delete_thread(run_key)
+
+
 @app.post("/chat/approve")
 async def approve(req: ApproveRequest):
     """[개선 11] 멈춘 그래프를 사람의 결정으로 재개한다."""
-    pending = _take_pending(req.thread_id)
+    pending = _get_pending(req.thread_id)
     result = await app.state.graph.ainvoke(
         Command(resume={"approved": req.approved, "comment": req.comment}),
         config=_run_config(pending["run_key"]))
+    _finish_run(req.thread_id, pending["run_key"])
     deps = app.state.deps
     deps.session_store.append(req.thread_id, "user", pending["message"])
     deps.session_store.append(req.thread_id, "assistant", result["final"])
@@ -271,6 +285,7 @@ async def _stream_graph(graph_input, run_key: str, thread_id: str, message: str,
             if delta.get("last_prompt"):
                 last_prompt = delta["last_prompt"]
     yield _sse({"type": "FinalAnswer", "reply": final, "prompt": last_prompt})
+    _finish_run(thread_id, run_key)
     deps.session_store.append(thread_id, "user", message)
     deps.session_store.append(thread_id, "assistant", final)
 
@@ -309,7 +324,7 @@ async def chat_stream(message: str, thread_id: str = "default"):
 @app.get("/chat/approve/stream")
 async def approve_stream(thread_id: str, approved: bool, comment: str = ""):
     """[개선 11] 승인/거절을 넘기고, 멈췄던 지점(approval)부터 finalize까지를 SSE로 이어서 보낸다."""
-    pending = _take_pending(thread_id)
+    pending = _get_pending(thread_id)
 
     async def body():
         snapshot = await app.state.graph.aget_state(_run_config(pending["run_key"]))

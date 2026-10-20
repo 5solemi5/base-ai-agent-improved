@@ -36,3 +36,17 @@ def test_recommendation_filter():
 def test_system_note_lines_removed():
     text = "1) CPU 91%입니다.\n\n✅ 운영자 승인 완료 — 위험 조치: 재시작"
     assert judge.SYSTEM_NOTE.sub("", text).strip() == "1) CPU 91%입니다."
+
+
+def test_recommendation_with_number_is_still_checked():
+    # [리뷰 반영] 숫자가 든 권고문은 거르지 않는다(틀린 수치가 '권고' 모양으로 숨는 것 방지)
+    class StubJudge(judge.Judge):
+        def __init__(self):
+            pass
+
+        def _ask(self, system, facts, answer, schema):
+            return {"claims": [{"claim": "CPU 97%로 증설이 필요", "supported": False, "evidence": ""},
+                               {"claim": "헬스체크 점검 필요", "supported": False, "evidence": ""}]}
+
+    out = StubJudge().claims("CPU 91%", "1) CPU 97%로 증설이 필요 2) 헬스체크 점검 필요")
+    assert [c["claim"] for c in out["detail"]] == ["CPU 97%로 증설이 필요"]

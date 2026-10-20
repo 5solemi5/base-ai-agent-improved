@@ -90,7 +90,10 @@ class Judge:
         bad, misquoted = [], []
         for c in out.get("claims", []):
             text = c.get("claim", "").strip()
-            if c.get("supported", False) or RECOMMENDATION.search(text):
+            if c.get("supported", False):
+                continue
+            # [리뷰 반영] 권고문이라도 숫자가 들어 있으면 거르지 않는다 — "CPU 97%로 증설이 필요"의 97%는 검사 대상
+            if RECOMMENDATION.search(text) and not NUMBER.search(text):
                 continue
             # 채점기가 답변을 잘못 옮겨 적은 경우(실측: 답변의 95%를 93%로 인용) — 답변에 없는 숫자가
             # 들어간 주장은 '답변의 문제'가 아니라 '채점기의 착오'로 따로 센다
