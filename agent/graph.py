@@ -7,44 +7,33 @@ incident: plan(MCP Prompt 절차 반영) → gate(권위 게이트) → research
 
 모든 노드는 SupervisorDeps를 functools.partial로 주입받는 순수 함수다(Wave 13).
 각 노드는 @traceable로 LangSmith에 계층 트리로 기록된다.
+
+[개선 요약 — Mini-Project 과제 1번]
+  1 성능   : route/plan/analyze의 동기 LLM 호출을 asyncio.to_thread로 — 이벤트 루프 블로킹 해소
+  2 정확도 : 조사 대상은 agent/systems.py가 쿼리 기준으로 결정, 모니터링 대상이 아닌 시스템만
+             물으면 unknown_system 노드에서 조사 없이 정직하게 안내(다른 시스템으로 바꿔치기 금지)
+  3 RAG    : replan_check의 incident_type 선택을 키워드 규칙 → runbook 벡터 검색(agent/runbook_retriever.py)
+  4 검증   : validate가 형식 + 근거(agent/grounding.py)를 함께 검사, 최대 시도 후 통과 시 경고 문구 첨부
 """
 import asyncio
-import json
 import time
 from functools import partial
-from pathlib import Path
-from typing import Any, TypedDict
+from typing import TypedDict
 
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, StateGraph
 from langsmith import traceable
 
 from .deps import SupervisorDeps
+from .grounding import check_grounding
 from .retry import with_retry
+from .runbook_retriever import RunbookRetriever
+from .systems import (INCIDENT_PATTERN, KNOWN_SYSTEMS, alias_system, resolve_query_systems,
+                      systems_in_text, unknown_systems_in_text)
 
 
-def _load_known_systems() -> set[str]:
-    """ollama_llm.py/openai_llm.py와 동일한 소스(data/monitoring.json)에서
-    시스템 목록을 읽는다 — plan_node가 MCP Prompt에 넘길 system_name을
-    쿼리에서 멤버십 매칭으로 뽑아낼 때 쓴다."""
-    path = Path(__file__).resolve().parent.parent / "data" / "monitoring.json"
-    try:
-        return set(json.loads(path.read_text()).keys())
-    except (OSError, json.JSONDecodeError):
-        return {"auth-service", "web-01"}
-
-
-KNOWN_SYSTEMS = _load_known_systems()
-
-
-def _extract_system_name(query: str) -> str:
-    """정규식 대신 실제 KNOWN_SYSTEMS 멤버십 매칭 — MCP Prompt(incident_analysis_
-    prompt)의 system_name은 "시스템: X" 한 줄짜리 컨텍스트라 항상 정해진 이름
-    중 하나로만 고정한다(여러 개 언급돼도 join하지 않음 — 실제 조사 대상 목록은
-    이후 plan()의 tasks가 별도로 결정). 쿼리에서 가장 먼저 등장하는 시스템을
-    고르고, 하나도 안 걸리면 가장 흔한 사례인 auth-service로 폴백."""
-    matches = [(query.index(s), s) for s in KNOWN_SYSTEMS if s in query]
-    return min(matches)[1] if matches else "auth-service"
+RETRIEVER = RunbookRetriever()   # [개선 3] runbook 인덱스는 프로세스당 1번만 만든다(W1 싱글턴과 같은 이유)
+MAX_VALIDATION_ATTEMPTS = 3
 
 
 class AgentState(TypedDict, total=False):
@@ -66,18 +55,38 @@ class AgentState(TypedDict, total=False):
     last_prompt: str
     cost_usd: float
     events: list[dict]
+    unknown_systems: list[str]   # [개선 2] 쿼리에 나왔지만 모니터링 대상이 아닌 시스템
+    grounding_issues: list[str]  # [개선 4] 마지막 검증에서 남은 근거 문제(최대 시도 후 통과 시 안내)
 
 
 def _cost(state: AgentState, usage: dict) -> float:
     return round(state.get("cost_usd", 0.0) + usage["usd"], 6)
 
 
+def route_gate(query: str, llm_route: str) -> str:
+    """[개선 1-보완] 라우팅 권위 게이트 — thinking을 끈 0.6b가 "제 이름은 민수입니다"를 incident로
+    보낸 회귀(실측)를 코드로 막는다. 장애 신호(증상 단어 또는 시스템 이름)가 '하나도 없으면' chat,
+    증상 단어와 시스템 이름이 '둘 다 있으면' incident로 확정하고, 그 사이 애매한 경우만 모델을 따른다."""
+    has_symptom = bool(INCIDENT_PATTERN.search(query))
+    # 시스템 이름 그대로 또는 별칭("로그인"→auth-service)이 있으면 '대상이 있다'로 본다
+    has_system = bool(systems_in_text(query) or unknown_systems_in_text(query) or alias_system(query))
+    if not has_symptom and not has_system:
+        return "chat"
+    if has_symptom and has_system:
+        return "incident"
+    return llm_route
+
+
 @traceable(name="route_node")
 async def route_node(state: AgentState, deps: SupervisorDeps) -> dict:
     """Wave 5 — 모든 쿼리가 무거운 파이프라인을 탈 필요는 없다."""
-    result, usage = deps.fast_llm.route(state["query"])
-    event = {"type": "RouteDecided", "route": result["route"]}
-    return {"route": result["route"], "needs_analysis": result["needs_analysis"],
+    # [개선 1] fast_llm.route는 동기 HTTP 호출 — 스레드로 넘겨 이벤트 루프(다른 요청·SSE)를 막지 않는다
+    result, usage = await asyncio.to_thread(deps.fast_llm.route, state["query"])
+    route = route_gate(state["query"], result["route"])
+    event = {"type": "RouteDecided", "route": route}
+    if route != result["route"]:   # 게이트가 모델 판단을 뒤집은 경우 기록(측정·디버깅용)
+        event["llm_route"] = result["route"]
+    return {"route": route, "needs_analysis": result["needs_analysis"],
             "cost_usd": _cost(state, usage),
             "events": state.get("events", []) + [event]}
 
@@ -104,19 +113,44 @@ async def plan_node(state: AgentState, deps: SupervisorDeps) -> dict:
 
     resource와 마찬가지로 이름을 어느 서버가 들고 있는지 미리 가정하지 않고,
     find_prompt()로 연결된 서버들을 먼저 조회해 찾은 뒤에만 get_prompt를 보낸다."""
+    resolved = resolve_query_systems(state["query"])
+    if not resolved["systems"]:
+        # [개선 2] 모니터링 대상이 아닌 시스템만 물었다 — LLM을 부르지 않고 바로 안내 경로로.
+        # 원본은 여기서 auth-service로 바꿔치기해 엉뚱한 진단서를 냈다.
+        event = {"type": "PlanCreated", "task_count": 0, "targets": [],
+                 "unknown_systems": resolved["unknown"]}
+        return {"tasks": [], "needs_analysis": False, "unknown_systems": resolved["unknown"],
+                "events": state["events"] + [event]}
+
     prompt_server = await deps.mcp.find_prompt("incident_analysis_prompt")
     procedure = await deps.mcp.get_prompt(
         "incident_analysis_prompt",
-        {"system_name": _extract_system_name(state["query"]), "symptom": state["query"]},
+        # MCP Prompt의 "시스템:" 줄에는 쿼리에서 찾은 시스템 전부를 넘긴다(원본은 첫 번째 하나만)
+        {"system_name": ", ".join(resolved["systems"]), "symptom": state["query"]},
         server=prompt_server,
     )
-    result, usage = deps.fast_llm.plan(state["query"], procedure)
+    result, usage = await asyncio.to_thread(deps.fast_llm.plan, state["query"], procedure)
     targets = [t["target"] for t in result["tasks"]
                if t["agent"] == "research" and t.get("target")]
+    unknown = result.get("unknown_systems", resolved["unknown"])
     event = {"type": "PlanCreated", "task_count": len(result["tasks"]),
-             "targets": targets}
+             "targets": targets, "target_source": result.get("target_source", resolved["source"])}
+    if unknown:
+        event["unknown_systems"] = unknown
     return {"tasks": result["tasks"], "needs_analysis": result["needs_analysis"],
+            "unknown_systems": unknown,
             "cost_usd": _cost(state, usage), "events": state["events"] + [event]}
+
+
+@traceable(name="unknown_system_node")
+async def unknown_system_node(state: AgentState, deps: SupervisorDeps) -> dict:
+    """[개선 2] 모니터링 대상이 아닌 시스템에 대한 정직한 안내. LLM 호출 없음(비용 0, 즉시 응답)."""
+    names = ", ".join(state.get("unknown_systems", []))
+    final = (f"{names}는(은) 현재 모니터링 대상이 아니라 상태를 조회할 수 없습니다. "
+             f"조회 가능한 시스템: {', '.join(sorted(KNOWN_SYSTEMS))}. "
+             f"위 시스템 중 관련된 것이 있으면 이름을 함께 알려 주세요.")
+    return {"final": final,
+            "events": state["events"] + [{"type": "Finalize", "pipeline": "unknown-system"}]}
 
 
 @traceable(name="gate_node")
@@ -186,33 +220,6 @@ async def research_node(state: AgentState, deps: SupervisorDeps) -> dict:
             "parallel_elapsed": elapsed, "events": events}
 
 
-# 수집된 모니터링 결과(상태·알림 문구)를 보고 어떤 runbook이 맞는지 고른다. LLM에게
-# 다시 묻는 대신 코드 레벨 규칙으로 판단한다 — gate(Wave 6)·replan(Wave 7)과 같은 설계
-# 원칙: 모델의 판단을 그대로 믿지 않고, 실측 데이터로 검증 가능한 결정은 코드가 내린다.
-_INCIDENT_TYPE_RULES = [
-    ("latency", "high-latency"),
-    ("pool", "high-latency"),
-    ("cpu", "cpu-spike"),
-    ("memory", "memory-leak"),
-    ("heap", "memory-leak"),
-    ("timeout", "network-timeout"),
-    ("network", "network-timeout"),
-    ("disk", "disk-full"),
-    ("down", "db-down"),
-]
-
-
-def _classify_incident_type(collected: list[dict]) -> str:
-    text = " ".join(
-        f"{c['data'].get('status', '')} " + " ".join(c["data"].get("alerts", []))
-        for c in collected if c.get("source") == "monitoring"
-    ).lower()
-    for keyword, incident_type in _INCIDENT_TYPE_RULES:
-        if keyword in text:
-            return incident_type
-    return "db-down"   # 매칭되는 증상이 없으면 가장 일반적인 장애 대응 절차로 폴백
-
-
 @traceable(name="replan_check_node")
 async def replan_check_node(state: AgentState, deps: SupervisorDeps) -> dict:
     """Wave 7 — 1차 수집 결과 평가. runbook이 없으면 gap task만 추가해 재조사."""
@@ -221,11 +228,14 @@ async def replan_check_node(state: AgentState, deps: SupervisorDeps) -> dict:
     if has_runbook or rounds >= 1:
         verdict = {"type": "ReplanCheck", "round": rounds, "is_sufficient": True}
         return {"events": state["events"] + [verdict]}
-    incident_type = _classify_incident_type(state.get("collected", []))
+    # [개선 3] 키워드 규칙 대신 runbook 벡터 검색 — 사용자 질문 + 저하된 시스템의 알림이 질의
+    picked = RETRIEVER.classify(state["query"], state.get("collected", []))
+    incident_type = picked["incident_type"]
     gap_task = {"id": "task-gap-runbook", "agent": "research", "kind": "runbook",
                 "target": incident_type, "status": "pending"}
     verdict = {"type": "ReplanCheck", "round": rounds, "is_sufficient": False,
-               "gap_task": gap_task["id"], "target": incident_type}
+               "gap_task": gap_task["id"], "target": incident_type,
+               "method": picked["method"], "scores": picked["scores"]}
     return {"tasks": state["tasks"] + [gap_task], "replan_rounds": rounds + 1,
             "events": state["events"] + [verdict]}
 
@@ -240,7 +250,7 @@ async def analysis_node(state: AgentState, deps: SupervisorDeps) -> dict:
     if not pending:
         return {"events": state["events"] +
                 [{"type": "AnalysisSkipped", "reason": "analysis task 0개"}]}
-    summary, usage = deps.fast_llm.analyze(state.get("collected", []))
+    summary, usage = await asyncio.to_thread(deps.fast_llm.analyze, state.get("collected", []))
     new_tasks = [dict(t) for t in tasks]
     for t in new_tasks:
         if t["agent"] == "analysis" and t["status"] == "pending":
@@ -273,29 +283,51 @@ async def write_node(state: AgentState, deps: SupervisorDeps) -> dict:
 
 @traceable(name="validate_node")
 async def validate_node(state: AgentState, deps: SupervisorDeps) -> dict:
-    """Wave 8 — 코드 기준 검증: 30자 이상 + 절차 번호 포함이어야 합격."""
+    """Wave 8 — 코드 기준 검증. [개선 4] 형식(30자 이상, 1) 2) 번호 절차) + 근거(grounding)."""
     draft = state["draft"]
     attempts = state.get("validation_attempts", 0) + 1
-    ok = len(draft) >= 30 and "1)" in draft
+    problems = []
+    if len(draft) < 30:
+        problems.append(f"응답이 너무 짧습니다({len(draft)}자, 최소 30자).")
+    if "1)" not in draft or "2)" not in draft:
+        problems.append("절차를 1) 2) 3) 번호로 구분해 구체적으로 설명하세요.")
+    issues = check_grounding(draft, state.get("collected", []), state.get("unknown_systems", []))
+    problems += issues
+    ok = not problems
     verdict = "합격" if ok else "불합격"
-    if not ok and attempts >= 3:   # 실모델 무한 재작성 방지 — 최대 3회 후 통과 처리
+    if not ok and attempts >= MAX_VALIDATION_ATTEMPTS:   # 무한 재작성 방지 — 통과시키되 문제는 기록
         ok, verdict = True, "합격(최대 시도 도달 — 통과 처리)"
-    feedback = None if ok else (
-        f"응답이 너무 짧습니다({len(draft)}자, 최소 30자). 절차를 1) 2) 3) 번호로 "
-        f"구체적으로 설명하세요.")
+    feedback = None if ok else " ".join(problems)
     event = {"type": "Validation", "attempt": attempts, "verdict": verdict}
+    if issues:
+        event["grounding_issues"] = issues
     return {"validation_attempts": attempts, "validation_feedback": feedback,
-            "events": state["events"] + [event]}
+            "grounding_issues": issues, "events": state["events"] + [event]}
 
 
 @traceable(name="finalize_node")
 async def finalize_node(state: AgentState, deps: SupervisorDeps) -> dict:
-    return {"final": state["draft"],
+    final = state["draft"]
+    notes = []
+    if state.get("unknown_systems"):   # [개선 2] 일부만 모니터링 대상이 아닐 때도 숨기지 않는다
+        notes.append(f"※ {', '.join(state['unknown_systems'])}는(은) 모니터링 대상이 아니라 조사하지 못했습니다.")
+    if state.get("grounding_issues"):  # [개선 4] 3회 재작성 후에도 남은 근거 문제를 사용자에게 알린다
+        notes.append("※ 자동 검증에서 근거를 확인하지 못한 내용이 있습니다: "
+                     + " / ".join(state["grounding_issues"]))
+    if notes:
+        final = final.rstrip() + "\n\n" + "\n".join(notes)
+    return {"final": final,
             "events": state["events"] + [{"type": "Finalize", "pipeline": "incident-v2"}]}
 
 
 def _after_route(state: AgentState) -> str:
     return "chat_answer" if state["route"] == "chat" else "plan"
+
+
+def _after_plan(state: AgentState) -> str:
+    """[개선 2] 조사할 시스템이 하나도 없으면(모니터링 대상이 아닌 시스템만 물음) 안내 노드로."""
+    has_research = any(t["agent"] == "research" for t in state.get("tasks", []))
+    return "gate" if has_research else "unknown_system"
 
 
 def _after_replan_check(state: AgentState) -> str:
@@ -313,6 +345,7 @@ def build_graph(deps: SupervisorDeps):
     g.add_node("route", node(route_node))
     g.add_node("chat_answer", node(chat_answer_node))
     g.add_node("plan", node(plan_node))
+    g.add_node("unknown_system", node(unknown_system_node))
     g.add_node("gate", node(gate_node))
     g.add_node("research", node(research_node))
     g.add_node("replan_check", node(replan_check_node))
@@ -325,7 +358,9 @@ def build_graph(deps: SupervisorDeps):
     g.add_conditional_edges("route", _after_route,
                             {"chat_answer": "chat_answer", "plan": "plan"})
     g.add_edge("chat_answer", END)
-    g.add_edge("plan", "gate")
+    g.add_conditional_edges("plan", _after_plan,
+                            {"gate": "gate", "unknown_system": "unknown_system"})
+    g.add_edge("unknown_system", END)
     g.add_edge("gate", "research")
     g.add_edge("research", "replan_check")
     g.add_conditional_edges("replan_check", _after_replan_check,
