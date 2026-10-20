@@ -1,0 +1,356 @@
+{
+ "summary": {
+  "rule": {
+   "accuracy": "8/12",
+   "caught_bad": "4/8",
+   "false_alarm": "0/4"
+  },
+  "score": {
+   "accuracy": "9/12",
+   "caught_bad": "8/8",
+   "false_alarm": "3/4"
+  },
+  "claims": {
+   "accuracy": "11/12",
+   "caught_bad": "8/8",
+   "false_alarm": "1/4"
+  },
+  "rule+claims": {
+   "accuracy": "11/12",
+   "caught_bad": "8/8",
+   "false_alarm": "1/4"
+  },
+  "avg_seconds": {
+   "score": 0.9,
+   "claims": 1.6
+  }
+ },
+ "rows": [
+  {
+   "id": 1,
+   "faithful": true,
+   "note": "",
+   "verdicts": {
+    "rule": true,
+    "score": true,
+    "claims": true,
+    "rule+claims": true
+   },
+   "rule": [],
+   "score": {
+    "score": 4,
+    "reason": "답변은 수집된 사실과 일치하지 않으며, 'payments-service-3 인스턴스 응답이 느립니다'와 'logs'에 대한 설명이 사실에 부적합합니다. 'logs'에 대한 설명은 'payment-service-3 request handler took 4200ms ×2'과 'worker thread pool saturation 95% ×1'에 대한 설명을 포함하지 않아, 사실과 일치하지 않습니다. 또한, 'runbook'에 따라 '반복 호출'과 '배치 중복 실행'을 확인하는 절차를 설명하지 않아, 답변이 사실에 충실하지 않습니다."
+   },
+   "claims": []
+  },
+  {
+   "id": 2,
+   "faithful": false,
+   "note": "수치 오류(97%)",
+   "verdicts": {
+    "rule": false,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [
+    "수집된 사실에 없는 수치가 있습니다(97%). 수치는 수집된 값을 그대로 인용하세요."
+   ],
+   "score": {
+    "score": 3,
+    "reason": "답변은 수집된 사실과 일치하지 않으며, 'payments-service CPU가 97%까지 올랐습니다.'라는 사실이 포함되지 않았습니다. 또한, 'logs'에 대한 설명은 'ERROR 2건, WARN 2건'이 포함되지 않았습니다. 답변은 사실에 충실하지 않으며, 'logs'과 'runbook'의 내용을 포함하지 않음."
+   },
+   "claims": [
+    {
+     "claim": "payments-service CPU가 97%까지 올랐습니다.",
+     "supported": false,
+     "evidence": ""
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "faithful": false,
+   "note": "조사하지 않은 시스템 단정",
+   "verdicts": {
+    "rule": false,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [
+    "조사하지 않은 시스템 auth-service에 대해 단정했습니다. 수집된 사실에 있는 시스템만 언급하세요."
+   ],
+   "score": {
+    "score": 3,
+    "reason": "답변은 수집된 사실과 일치하지 않습니다. 'payments-service CPU 91.0%'와 'auth-service 커넥션 풀 고갈이 근본 원인입니다.'은 사실에 맞지 않습니다. '3) 풀 크기를 늘리세요.'은 사실에 맞지 않습니다. 답변이 사실과 다릅니다."
+   },
+   "claims": [
+    {
+     "claim": "payments-service CPU 91.0%",
+     "supported": false,
+     "evidence": "모니터링 payments-service: CPU 91.0% (threshold 80%)"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "faithful": false,
+   "note": "단위 없는 개수 오류(ERROR 5건, 실제 2건) — 규칙 검사는 %·ms·s만 본다",
+   "verdicts": {
+    "rule": true,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [],
+   "score": {
+    "score": 3,
+    "reason": "답변은 수집된 사실과 일치하지 않으며, 'payments-service CPU 91.0%로 높습니다.'과 'recent logs'에 대한 정보를 포함하지 않았습니다. 또한, 'runbook'에 따라 반복 호출 여부를 확인하는 점을 명시하지 않았습니다."
+   },
+   "claims": [
+    {
+     "claim": "payments-service CPU 91.0%로 높습니다.",
+     "supported": false,
+     "evidence": "모니터링 payments-service: 상태=degraded, CPU 91.0%, 메모리 55.0%, 알림 2건"
+    },
+    {
+     "claim": "recent log error payments-service-3 request handler took 4200ms ×2; WARN worker thread pool saturation 95% ×1; WARN retry storm detected: same order retried 3 times ×1",
+     "supported": false,
+     "evidence": "log payments-service: ERROR 2건, WARN 2건 — ERROR payments-service-3 request handler took 4200ms ×2; WARN worker thread pool saturation 95% ×1; WARN retry storm detected: same order retried 3 times ×1"
+    },
+    {
+     "claim": "payments-service CPU 91.0%로 높습니다.",
+     "supported": false,
+     "evidence": "모니터링 payments-service: 상태=degraded, CPU 91.0%, 메모리 55.0%, 알림 2건"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "faithful": true,
+   "note": "",
+   "verdicts": {
+    "rule": true,
+    "score": false,
+    "claims": true,
+    "rule+claims": true
+   },
+   "rule": [],
+   "score": {
+    "score": 3,
+    "reason": "답변은 수집된 사실과 일치하지 않으며, 'gateway-service'에서 'payments-service'로 가는 upstream 3000ms 타임아웃(504)이 로그에 2건 있고 패킷 손실 3% 알림이 있음을 명확히 설명하지 않았습니다. 또한, 'payments-service'의 상태는 CPU 91.0%로 저하 상태입니다. runbook의 점검 사항은 DNS, 방화벽, 로드밸런서 헬스체크 변경 등을 포함하지 않았습니다. 이는 답변의 사실성과 일치하지 않음을 나타냅니다."
+   },
+   "claims": []
+  },
+  {
+   "id": 6,
+   "faithful": false,
+   "note": "상태와 모순되는 원인 단정(gateway CPU는 30%) — 수치가 없어 규칙 검사가 못 잡음",
+   "verdicts": {
+    "rule": true,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [],
+   "score": {
+    "score": 3,
+    "reason": "답변은 수집된 사실에 충실하지 않으며, '모니터링 gateway-service'의 상태와 CPU, 메모리, 알림 정보를 명확히 설명하지 않았습니다. 또한, 'Runbook'의 점검 절차와 관련된 내용은 답변에 포함되지 않았습니다."
+   },
+   "claims": [
+    {
+     "claim": "모니터링 gateway-service: 상태=degraded, CPU 30.0%, 메모리 45.0%, 알림 2건 ['upstream timeout to payments-service (504)', 'network packet loss 3%']",
+     "supported": false,
+     "evidence": "모니터링 gateway-service: 상태=degraded, CPU 30.0%, 메모리 45.0%, 알림 2건 ['upstream timeout to payments-service (504)', 'network packet loss 3%']"
+    },
+    {
+     "claim": "모니터링 payments-service: 상태=degraded, CPU 91.0%, 메모리 55.0%, 알림 2건 ['CPU 91% (threshold 80%)', 'payments-service-3 instance responding slow']",
+     "supported": false,
+     "evidence": "모니터링 payments-service: 상태=degraded, CPU 91.0%, 메모리 55.0%, 알림 2건 ['CPU 91% (threshold 80%)', 'payments-service-3 instance responding slow']"
+    },
+    {
+     "claim": "로그 gateway-service: ERROR 2건, WARN 2건 — ERROR upstream timeout to payments-service after 3000ms (504) ×2; WARN retry 2/3 to payments-service ×1; WARN packet loss 3% on link az-b ×1",
+     "supported": false,
+     "evidence": "로그 gateway-service: ERROR 2건, WARN 2건 — ERROR upstream timeout to payments-service after 3000ms (504) ×2; WARN retry 2/3 to payments-service ×1; WARN packet loss 3% on link az-b ×1"
+    },
+    {
+     "claim": "로그 payments-service: ERROR 2건, WARN 2건 — ERROR payments-service-3 request handler took 4200ms ×2; WARN worker thread pool saturation 95% ×1; WARN retry storm detected: same order retried 3 times ×1",
+     "supported": false,
+     "evidence": "로그 payments-service: ERROR 2건, WARN 2건 — ERROR payments-service-3 request handler took 4200ms ×2; WARN worker thread pool saturation 95% ×1; WARN retry storm detected: same order retried 3 times ×1"
+    },
+    {
+     "claim": "runbook 발췌: # Runbook: 네트워크 타임아웃 대응 절차",
+     "supported": false,
+     "evidence": "runbook 발췌: # Runbook: 네트워크 타임아웃 대응 절차"
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "faithful": true,
+   "note": "",
+   "verdicts": {
+    "rule": true,
+    "score": false,
+    "claims": true,
+    "rule+claims": true
+   },
+   "rule": [],
+   "score": {
+    "score": 3,
+    "reason": "답변은 수집된 사실을 사실로 충실하게 반영하지 않으며, '공통 원인' 확인을 추가하는 것이 필요하다. 'CPU'와 '메모리'의 차이를 명확히 하지 않으며, 'cache-service'의 메모리 상태를 '추세'로 설명하지 않으며, 'runbook'의 절차를 명확히 하지 않음."
+   },
+   "claims": []
+  },
+  {
+   "id": 8,
+   "faithful": false,
+   "note": "수치는 맞지만 추론이 틀림(payments 메모리 55%는 정상) — 규칙 검사가 못 잡음",
+   "verdicts": {
+    "rule": true,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [],
+   "score": {
+    "score": 3,
+    "reason": "답변은 수집된 사실과 일치하지 않으며, 'payments-service'의 메모리 사용률(55.0%)와 'cache-service'의 메모리 사용률(89.0%)을 정확히 언급하지 않았습니다. 또한, 'two services'을 언급하지만 'payments-service'와 'cache-service'의 상태를 명확히 설명하지 않았습니다. 이는 답변이 사실에 충실하지 않음을 나타냅니다."
+   },
+   "claims": [
+    {
+     "claim": "모니터링 payments-service: 상태=degraded, CPU 91.0%, 메모리 55.0%, 알림 2건",
+     "supported": false,
+     "evidence": ""
+    },
+    {
+     "claim": "모니터링 payments-service: 상태=degraded, CPU 42.0%, 메모리 89.0%, 알림 2건",
+     "supported": false,
+     "evidence": ""
+    },
+    {
+     "claim": "로그 payments-service: ERROR 2건, WARN 2건 — ERROR payments-service-3 request handler took 4200ms ×2; WARN worker thread pool saturation 95% ×1; WARN retry storm detected: same order retried 3 times ×1",
+     "supported": false,
+     "evidence": ""
+    },
+    {
+     "claim": "로그 cache-service: ERROR 1건, WARN 2건 — ERROR heap usage 89%, eviction not keeping up ×1; WARN heap usage 80% ×1; WARN GC pause 900ms ×1",
+     "supported": false,
+     "evidence": ""
+    },
+    {
+     "claim": "runbook 발췌: 메모리 누수(Memory Leak) 대응 절차",
+     "supported": false,
+     "evidence": ""
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "faithful": true,
+   "note": "",
+   "verdicts": {
+    "rule": true,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [],
+   "score": {
+    "score": 3,
+    "reason": "답변은 수집된 사실에 충실하지 않으며, 'web-01은 healthy이고 CPU 34.0%로 급증은 확인되지 않았습니다.'라는 표현이 사실에 충실하지 않으며, 'auth-service는 p95 2.4s, 커넥션 풀 92% 사용이며 로그에 풀 고갈 ERROR가 2건 있습니다.'라는 표현이 사실에 충실하지 않으며, 'runbook에 따라 풀 크기를 늘리거나 느린 쿼리에 타임아웃을 거세요.'라는 표현이 사실에 충실하지 않으며, 전체적으로 사실과 일치하지 않음."
+   },
+   "claims": [
+    {
+     "claim": "1) web-01은 healthy이고 CPU 34.0%로 급증은 확인되지 않았습니다.",
+     "supported": false,
+     "evidence": "모니터링 web-01: 상태=healthy, CPU 34.0%, 메모리 48.0%, 알림 0건 []"
+    }
+   ]
+  },
+  {
+   "id": 10,
+   "faithful": false,
+   "note": "상태 모순(web-01은 healthy) — 수치가 없어 규칙 검사가 못 잡음",
+   "verdicts": {
+    "rule": true,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [],
+   "score": {
+    "score": 3,
+    "reason": "답변은 수집된 사실과 일치하지 않습니다. 답변은 'web-01도 저하 상태로 CPU가 급증했습니다.'(1)와 'auth-service 커넥션 풀이 거의 찼습니다.'(2)를 포함하지만, 'runbook 발췌'에 따르면 'web-01도 저하 상태로 CPU가 급증했습니다.'(1)은 사실에 충실하지 않습니다. 'runbook'에 따르면 'web-01도 저하 상태로 CPU가 급증했습니다.'(1)은 사실에 충실하지 않으며, 'auth-service 커넥션 풀이 거의 찼습니다.'(2)은 사실에 충실하지 않습니다. 따라서 답변이 사실에 충실하지 않으며, 3점으로 채점됩니다."
+   },
+   "claims": [
+    {
+     "claim": "모니터링 web-01: 상태=healthy, CPU 34.0%, 메모리 48.0%, 알림 0건 []",
+     "supported": false,
+     "evidence": ""
+    },
+    {
+     "claim": "runbook 발췌: 응답 지연(High Latency) 대응 절차",
+     "supported": false,
+     "evidence": ""
+    }
+   ]
+  },
+  {
+   "id": 11,
+   "faithful": false,
+   "note": "수치 오류(p95 3.1s)",
+   "verdicts": {
+    "rule": false,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [
+    "수집된 사실에 없는 수치가 있습니다(3.1s). 수치는 수집된 값을 그대로 인용하세요."
+   ],
+   "score": {
+    "score": 3,
+    "reason": "답변은 사실에 충실하지 않으며, 'web-01은 healthy입니다.'과 'auth-service p95가 3.1s이고 커넥션 풀 92% 사용 중입니다.'이 사실에 충실하지 않으며, '3) 풀 크기를 늘리세요.'은 사실에 충실하지 않으며, '4) 5분 내 p95가 임계치(1.0s) 아래로 내려오지 않으면 캐시 계층 또는 읽기 복제본으로 트래픽을 분산한다.'는 사실과 일치하지 않습니다. 답변이 사실과 일치하지 않으며, '답변'이 사실에 충실하지 않음."
+   },
+   "claims": [
+    {
+     "claim": "runbook 발췌: 응답 지연(High Latency) 대응 절차",
+     "supported": false,
+     "evidence": ""
+    }
+   ]
+  },
+  {
+   "id": 12,
+   "faithful": false,
+   "note": "없는 설정값(5000ms) 지어냄",
+   "verdicts": {
+    "rule": false,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [
+    "수집된 사실에 없는 수치가 있습니다(5000ms). 수치는 수집된 값을 그대로 인용하세요."
+   ],
+   "score": {
+    "score": 3,
+    "reason": "답변은 수집된 사실과 일치하지 않으며, '5000ms'과 '3% 손실'을 포함하지 않았습니다. 또한, '네트워크 경로 기록'과 '재시도 정책'의 내용은 수집된 사실에 없습니다."
+   },
+   "claims": [
+    {
+     "claim": "모니터링 gateway-service: 상태=degraded, CPU 30.0%, 메모리 45.0%, 알림 2건 ['upstream timeout to payments-service (504)', 'network packet loss 3%']",
+     "supported": false,
+     "evidence": "모니터링 gateway-service: 상태=degraded, CPU 30.0%, 메모리 45.0%, 알림 2건 ['upstream timeout to payments-service (504)', 'network packet loss 3%']"
+    },
+    {
+     "claim": "모니터링 payments-service: 상태=degraded, CPU 91.0%, 메모리 55.0%, 알림 2건 ['CPU 91% (threshold 80%)', 'payments-service-3 instance responding slow']",
+     "supported": false,
+     "evidence": "모니터링 payments-service: 상태=degraded, CPU 91.0%, 메모리 55.0%, 알림 2건 ['CPU 91% (threshold 80%)', 'payments-service-3 instance responding slow']"
+    }
+   ]
+  }
+ ]
+}

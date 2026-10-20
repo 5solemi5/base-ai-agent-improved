@@ -42,6 +42,7 @@ from agent.fake_llm import FastLLM, QualityLLM
 from agent.graph import build_graph
 from agent.mcp_client import MCPClient
 from agent.memory import load_history
+from agent.ollama_llm import format_facts
 from agent.session_store import SqliteSessionStore
 from agent.supervisor_v1 import run_v1
 
@@ -146,6 +147,7 @@ def _metadata(result: dict, run_id: str | None) -> dict:
         "agents_called": result.get("agents_called", []),   # [개선 10]
         "approval": result.get("approval"),                  # [개선 11]
         "memory": result.get("memory"),                      # [개선 12] 메시지 수·요약 범위
+        "facts": format_facts(result.get("collected", [])),  # [개선 13] LLM-as-judge 채점 근거
         "cost_usd": result.get("cost_usd", 0.0),
         "llm_backend": app.state.llm_backend,
         "supervisor_version": app.state.deps.version,

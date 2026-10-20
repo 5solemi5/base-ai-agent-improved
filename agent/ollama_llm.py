@@ -205,8 +205,8 @@ class OllamaQualityLLM(OllamaLLM):
             on_token=on_token)
 
 
-def build_write_prompt(query: str, collected: list[dict], feedback: str | None) -> str:
-    """write 프롬프트의 '사실' 부분 — openai_llm.py도 같이 쓴다(원본은 두 파일에 복사돼 있었다)."""
+def format_facts(collected: list[dict]) -> str:
+    """수집된 사실을 프롬프트용 텍스트로. write 프롬프트와 [개선 13] LLM-as-judge가 같은 사실을 보도록 공유한다."""
     facts = []
     for c in collected:
         if c["source"] == "monitoring":
@@ -223,7 +223,12 @@ def build_write_prompt(query: str, collected: list[dict], feedback: str | None) 
             facts.append(f"- runbook 발췌:\n{c['data'].strip()}")
         elif c["source"] == "analysis":
             facts.append(f"- 패턴 분석: {c['data'].strip()}")
-    user = f"## 사용자 요청\n{query}\n\n## 수집된 사실\n" + "\n".join(facts)
+    return "\n".join(facts)
+
+
+def build_write_prompt(query: str, collected: list[dict], feedback: str | None) -> str:
+    """write 프롬프트의 '사실' 부분 — openai_llm.py도 같이 쓴다(원본은 두 파일에 복사돼 있었다)."""
+    user = f"## 사용자 요청\n{query}\n\n## 수집된 사실\n" + format_facts(collected)
     if feedback:
         user += f"\n\n## 이전 초안에 대한 검증 반려 사유 (반드시 반영)\n{feedback}"
     return user

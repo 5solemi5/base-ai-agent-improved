@@ -1,0 +1,300 @@
+{
+ "summary": {
+  "rule": {
+   "accuracy": "8/12",
+   "caught_bad": "4/8",
+   "false_alarm": "0/4"
+  },
+  "score": {
+   "accuracy": "12/12",
+   "caught_bad": "8/8",
+   "false_alarm": "0/4"
+  },
+  "claims": {
+   "accuracy": "12/12",
+   "caught_bad": "8/8",
+   "false_alarm": "0/4"
+  },
+  "rule+claims": {
+   "accuracy": "12/12",
+   "caught_bad": "8/8",
+   "false_alarm": "0/4"
+  },
+  "avg_seconds": {
+   "score": 5.8,
+   "claims": 11.5
+  }
+ },
+ "rows": [
+  {
+   "id": 1,
+   "faithful": true,
+   "note": "",
+   "verdicts": {
+    "rule": true,
+    "score": true,
+    "claims": true,
+    "rule+claims": true
+   },
+   "rule": [],
+   "score": {
+    "score": 4,
+    "reason": "답변은 대부분의 수집된 사실을 정확히 반영하고 있으며, CPU 사용률, 인스턴스 응답 지연, 로그의 ERROR 발생을 잘 요약했습니다. 다만, runbook의 세부 절차 중 '오토스케일링 그룹에서 인스턴스 추가'와 '롤백' 등의 구체적인 조치는 언급하지 않았고, '워커 스레드 풀 포화'와 '리트라이 폭풍' 같은 추가 정보도 생략했습니다. 하지만 전체적으로 사실에 충실한 답변입니다."
+   },
+   "claims": []
+  },
+  {
+   "id": 2,
+   "faithful": false,
+   "note": "수치 오류(97%)",
+   "verdicts": {
+    "rule": false,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [
+    "수집된 사실에 없는 수치가 있습니다(97%). 수치는 수집된 값을 그대로 인용하세요."
+   ],
+   "score": {
+    "score": 3,
+    "reason": "답변은 일부 사실을 정확히 반영하고 있지만, 'CPU 97%'는 수집된 사실(91%)과 다릅니다. 또한, '반복 호출 여부를 확인하세요'는 runbook에 명시된 절차 중 하나이지만, 답변이 이를 명확히 설명하지 않아 사실에 충실하지 않습니다."
+   },
+   "claims": [
+    {
+     "claim": "payments-service CPU가 97%까지 올랐습니다.",
+     "supported": false,
+     "evidence": "모니터링 payments-service: 상태=degraded, CPU 91.0%, 메모리 55.0%, 알림 2건 ['CPU 91% (threshold 80%)', 'payments-service-3 instance responding slow']"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "faithful": false,
+   "note": "조사하지 않은 시스템 단정",
+   "verdicts": {
+    "rule": false,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [
+    "조사하지 않은 시스템 auth-service에 대해 단정했습니다. 수집된 사실에 있는 시스템만 언급하세요."
+   ],
+   "score": {
+    "score": 1,
+    "reason": "답변은 'auth-service 커넥션 풀 고갈'이라는 사실이 수집된 사실에 없으며, 이는 지어낸 내용입니다. 또한, '풀 크기를 늘리세요'는 runbook에 명시된 대응 절차와도 일치하지 않습니다. 수집된 사실에 기반한 정확한 분석이 부족합니다."
+   },
+   "claims": [
+    {
+     "claim": "auth-service 커넥션 풀 고갈이 근본 원인입니다.",
+     "supported": false,
+     "evidence": ""
+    },
+    {
+     "claim": "풀 크기를 늘리세요.",
+     "supported": false,
+     "evidence": ""
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "faithful": false,
+   "note": "단위 없는 개수 오류(ERROR 5건, 실제 2건) — 규칙 검사는 %·ms·s만 본다",
+   "verdicts": {
+    "rule": true,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [],
+   "score": {
+    "score": 2,
+    "reason": "답변은 일부 사실을 올바르게 반영했으나, 중요한 정보를 누락하거나 오해를 일으킬 수 있는 표현이 포함되어 있습니다. 예를 들어, 'ERROR 2건'을 'ERROR 5건'으로 잘못 기술했고, runbook의 구체적인 대응 절차를 충분히 반영하지 않았습니다. 또한, '반복 호출 여부를 확인하세요'는 runbook의 절차를 명확히 설명하지 않아 사실에 충실하지 않습니다."
+   },
+   "claims": [
+    {
+     "claim": "최근 로그에 ERROR가 5건 발생했습니다.",
+     "supported": false,
+     "evidence": "로그 payments-service: ERROR 2건, WARN 2건 — ERROR payments-service-3 request handler took 4200ms ×2; WARN worker thread pool saturation 95% ×1; WARN retry storm detected: same order retried 3 times ×1"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "faithful": true,
+   "note": "",
+   "verdicts": {
+    "rule": true,
+    "score": true,
+    "claims": true,
+    "rule+claims": true
+   },
+   "rule": [],
+   "score": {
+    "score": 5,
+    "reason": "답변은 수집된 사실에 모두 충실하며, 모든 내용이 사실과 일치합니다. gateway-service의 upstream timeout, 패킷 손실, payments-service의 CPU 사용률, 로그 내용, 그리고 runbook에 따른 대응 절차까지 정확히 반영하고 있습니다."
+   },
+   "claims": []
+  },
+  {
+   "id": 6,
+   "faithful": false,
+   "note": "상태와 모순되는 원인 단정(gateway CPU는 30%) — 수치가 없어 규칙 검사가 못 잡음",
+   "verdicts": {
+    "rule": true,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [],
+   "score": {
+    "score": 2,
+    "reason": "답변은 일부 사실을 반영하고 있지만, 주요 원인을 잘못 파악하고 있습니다. 'gateway-service'의 CPU 과부하는 일부 문제일 수 있지만, 주요 원인은 'payments-service'의 CPU 과부하와 네트워크 패킷 손실입니다. 또한, 'payments-service-3'의 요청 처리 지연과 재시도 폭주도 중요한 요인입니다. 답변은 이 점들을 무시하고 있으며, runbook에 제시된 절차도 반영하지 않았습니다."
+   },
+   "claims": [
+    {
+     "claim": "gateway-service의 CPU 과부하가 타임아웃의 원인입니다.",
+     "supported": false,
+     "evidence": ""
+    },
+    {
+     "claim": "gateway-service 인스턴스를 늘려 CPU 부하를 낮추세요.",
+     "supported": false,
+     "evidence": ""
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "faithful": true,
+   "note": "",
+   "verdicts": {
+    "rule": true,
+    "score": true,
+    "claims": true,
+    "rule+claims": true
+   },
+   "rule": [],
+   "score": {
+    "score": 5,
+    "reason": "답변은 수집된 사실에 완전히 기반을 두고 있으며, 모든 내용이 사실과 일치합니다. 1) payments-service의 CPU 과부하와 cache-service의 메모리 과부하를 정확히 지적하고, 2) 공통 원인을 확인할 수 없다는 점을 인정하며, 3) runbook에 따라 cache-service의 메모리 추세와 힙 덤프 분석을 권장하고 있습니다. 모든 내용이 사실에 충실합니다."
+   },
+   "claims": []
+  },
+  {
+   "id": 8,
+   "faithful": false,
+   "note": "수치는 맞지만 추론이 틀림(payments 메모리 55%는 정상) — 규칙 검사가 못 잡음",
+   "verdicts": {
+    "rule": true,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [],
+   "score": {
+    "score": 3,
+    "reason": "답변은 일부 사실에 충실하지만, 중요한 정보를 누락하고 있습니다. 예를 들어, payments-service의 메모리 사용률은 55%로 낮지만 CPU 사용률이 91%로 높고, 알림도 포함되어야 합니다. 또한, cache-service의 메모리 사용률이 89%로 OOM 직전임을 강조해야 합니다. 또한, '공통 원인은 메모리 누수'라는 결론은 runbook에 기반하지 않으며, 구체적인 원인을 파악하기 위한 절차를 제시해야 합니다."
+   },
+   "claims": [
+    {
+     "claim": "두 시스템의 공통 원인은 메모리 누수입니다.",
+     "supported": false,
+     "evidence": ""
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "faithful": true,
+   "note": "",
+   "verdicts": {
+    "rule": true,
+    "score": true,
+    "claims": true,
+    "rule+claims": true
+   },
+   "rule": [],
+   "score": {
+    "score": 5,
+    "reason": "답변은 수집된 사실과 완전히 일치합니다. web-01의 상태, auth-service의 p95 지연시간, 커넥션 풀 사용률, ERROR 로그 내용, 그리고 runbook에 따른 대응 조치 모두 수집된 사실에 기반하여 정확하게 반영되었습니다."
+   },
+   "claims": []
+  },
+  {
+   "id": 10,
+   "faithful": false,
+   "note": "상태 모순(web-01은 healthy) — 수치가 없어 규칙 검사가 못 잡음",
+   "verdicts": {
+    "rule": true,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [],
+   "score": {
+    "score": 2,
+    "reason": "답변은 일부 사실을 반영하고 있지만, 모니터링 상태와 로그 정보를 충분히 고려하지 않았습니다. 예를 들어, web-01은 'healthy' 상태이며 CPU는 34%로 정상입니다. 답변에서 '저하 상태'로 기술한 것은 사실과 다릅니다. 또한, '두 서버를 모두 점검하세요'는 지나치게 일반적이고, runbook에 기반한 구체적인 대응 조치가 누락되었습니다."
+   },
+   "claims": [
+    {
+     "claim": "web-01도 저하 상태로 CPU가 급증했습니다.",
+     "supported": false,
+     "evidence": ""
+    }
+   ]
+  },
+  {
+   "id": 11,
+   "faithful": false,
+   "note": "수치 오류(p95 3.1s)",
+   "verdicts": {
+    "rule": false,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [
+    "수집된 사실에 없는 수치가 있습니다(3.1s). 수치는 수집된 값을 그대로 인용하세요."
+   ],
+   "score": {
+    "score": 3,
+    "reason": "답변은 일부 사실에 충실하지만, 'p95 latency 2.4s (threshold 1.0s)'라는 수집된 사실을 'p95가 3.1s'라고 잘못 기술한 점이 있음. 이는 사실과 다르므로 점수를 낮추었습니다."
+   },
+   "claims": [
+    {
+     "claim": "auth-service p95가 3.1s이고 커넥션 풀 92% 사용 중입니다.",
+     "supported": false,
+     "evidence": ""
+    }
+   ]
+  },
+  {
+   "id": 12,
+   "faithful": false,
+   "note": "없는 설정값(5000ms) 지어냄",
+   "verdicts": {
+    "rule": false,
+    "score": false,
+    "claims": false,
+    "rule+claims": false
+   },
+   "rule": [
+    "수집된 사실에 없는 수치가 있습니다(5000ms). 수치는 수집된 값을 그대로 인용하세요."
+   ],
+   "score": {
+    "score": 2,
+    "reason": "답변은 일부 사실을 반영하고 있지만, 수집된 사실과 비교해 중요한 정보를 누락하고 있으며, 일부 내용은 사실과 일치하지 않습니다. 예를 들어, 'gateway-service 타임아웃 설정이 5000ms'라는 내용은 수집된 사실에 없으며, 'payments-service 응답이 그보다 늦습니다'라는 주장도 구체적인 데이터 없이 추측입니다. 또한, '패킷 손실 3% 알림'은 사실에 해당하지만, '헬스체크를 점검하세요'는 수집된 사실에 기반한 구체적인 조치가 아닙니다."
+   },
+   "claims": [
+    {
+     "claim": "gateway-service 타임아웃 설정이 5000ms인데 payments-service 응답이 그보다 늙습니다.",
+     "supported": false,
+     "evidence": ""
+    }
+   ]
+  }
+ ]
+}
