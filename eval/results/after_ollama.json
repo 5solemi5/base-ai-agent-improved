@@ -1,0 +1,800 @@
+{
+ "label": "after_ollama",
+ "url": "http://127.0.0.1:8102",
+ "summary": {
+  "queries": 9,
+  "route_accuracy": "9/9",
+  "incident_total_s": 51.7,
+  "all_total_s": 52.3,
+  "missing_systems": 0,
+  "extra_systems": 0,
+  "runbook_accuracy": "6/6",
+  "unknown_handled": "1/1",
+  "flagged_answers": 0,
+  "name_memory": true,
+  "cost_usd": 0.016716,
+  "retry_total": 1,
+  "validation_attempts_total": 5
+ },
+ "rows": [
+  {
+   "id": 1,
+   "query": "payments-service 결제 응답이 느려지고 CPU가 치솟았어요, 원인 확인해주세요",
+   "elapsed_s": 11.4,
+   "route": "incident",
+   "route_ok": true,
+   "cost_usd": 0.003087,
+   "retry_count": 1,
+   "validation_attempts": 1,
+   "probed": [
+    "payments-service"
+   ],
+   "runbooks": [
+    "cpu-spike"
+   ],
+   "reply": "1) 모니터링 상태 확인: payments-service의 상태는 degraded로, CPU 사용률은 93.2%, 메모리 사용률은 56.1%이며, 알림 2건 발생(‘CPU 91% (threshold 80%)’, ‘payments-service-3 instance responding slow’).  \n2) 로그 및 요청 패턴 확인: 최근 로그에서 반복 호출, 배치 작업 중복 실행 같은 특정 요청 패턴이 원인인지 확인 필요.  \n3) 인스턴스 확장 및 롤백 검토: CPU 사용률이 90%를 넘고 지속되는 경우, 해당 인스턴스를 오토스케일링 그룹에서 한 대 더 띄워 부하 분산 필요. 배포 직후 급증 시 직전 배포 롤백 및 원인 분석 필요.",
+   "events": [
+    {
+     "type": "RouteDecided",
+     "route": "incident"
+    },
+    {
+     "type": "PlanCreated",
+     "task_count": 1,
+     "targets": [
+      "payments-service"
+     ],
+     "target_source": "query"
+    },
+    {
+     "type": "GateApplied",
+     "removed_analysis_tasks": 0
+    },
+    {
+     "type": "TaskCompleted",
+     "id": "task-0",
+     "source": "monitoring",
+     "target": "payments-service",
+     "retries": 1
+    },
+    {
+     "type": "ReplanCheck",
+     "round": 0,
+     "is_sufficient": false,
+     "gap_task": "task-gap-runbook",
+     "target": "cpu-spike",
+     "method": "tfidf",
+     "scores": [
+      [
+       "cpu-spike",
+       0.961
+      ],
+      [
+       "high-latency",
+       0.744
+      ],
+      [
+       "db-down",
+       0.141
+      ]
+     ]
+    },
+    {
+     "type": "TaskCompleted",
+     "id": "task-gap-runbook",
+     "source": "runbook",
+     "target": "cpu-spike",
+     "retries": 0
+    },
+    {
+     "type": "ReplanCheck",
+     "round": 1,
+     "is_sufficient": true
+    },
+    {
+     "type": "AnalysisSkipped",
+     "reason": "analysis task 0개"
+    },
+    {
+     "type": "DraftWritten",
+     "attempt": 1,
+     "length": 357
+    },
+    {
+     "type": "Validation",
+     "attempt": 1,
+     "verdict": "합격"
+    },
+    {
+     "type": "Finalize",
+     "pipeline": "incident-v2"
+    }
+   ],
+   "metadata": {
+    "route": "incident",
+    "task_count": 2,
+    "gate_removed": 0,
+    "replan_rounds": 1,
+    "retry_count": 1,
+    "parallel_elapsed": 0.36,
+    "validation_attempts": 1,
+    "unknown_systems": [],
+    "grounding_issues": [],
+    "runbook_method": "tfidf",
+    "cost_usd": 0.003087,
+    "llm_backend": "ollama",
+    "supervisor_version": "v2",
+    "instance_id": 4489818048,
+    "langsmith_run_id": null
+   },
+   "missing": [],
+   "extra": [],
+   "runbook_ok": true,
+   "flags": []
+  },
+  {
+   "id": 2,
+   "query": "gateway-service에서 payments-service로 가는 요청이 타임아웃 나고 있어요",
+   "elapsed_s": 10.2,
+   "route": "incident",
+   "route_ok": true,
+   "cost_usd": 0.003406,
+   "retry_count": 0,
+   "validation_attempts": 1,
+   "probed": [
+    "gateway-service",
+    "payments-service"
+   ],
+   "runbooks": [
+    "network-timeout"
+   ],
+   "reply": "1) gateway-service에서 payments-service로 가는 요청이 타임아웃 발생, 모니터링 상태 degraded, CPU 27.9%, 메모리 44.0%, 알림 2건 ['upstream timeout to payments-service (504)', 'network packet loss 3%']  \n2) payments-service 상태도 degraded, CPU 95.5%, 메모리 57.2%, 알림 2건 ['CPU 91% (threshold 80%)', 'payments-service-3 instance responding slow']  \n3) Runbook에 따라 get_monitoring_status로 타임아웃 발생 시스템 확인 필요, DNS, 방화벽/보안그룹, 로드밸런서 헬스체크 변경 점검 필요.",
+   "events": [
+    {
+     "type": "RouteDecided",
+     "route": "incident"
+    },
+    {
+     "type": "PlanCreated",
+     "task_count": 3,
+     "targets": [
+      "gateway-service",
+      "payments-service"
+     ],
+     "target_source": "query"
+    },
+    {
+     "type": "GateApplied",
+     "removed_analysis_tasks": 1
+    },
+    {
+     "type": "TaskCompleted",
+     "id": "task-0",
+     "source": "monitoring",
+     "target": "gateway-service",
+     "retries": 0
+    },
+    {
+     "type": "TaskCompleted",
+     "id": "task-1",
+     "source": "monitoring",
+     "target": "payments-service",
+     "retries": 0
+    },
+    {
+     "type": "ReplanCheck",
+     "round": 0,
+     "is_sufficient": false,
+     "gap_task": "task-gap-runbook",
+     "target": "network-timeout",
+     "method": "tfidf",
+     "scores": [
+      [
+       "network-timeout",
+       1.254
+      ],
+      [
+       "cpu-spike",
+       0.716
+      ],
+      [
+       "high-latency",
+       0.288
+      ]
+     ]
+    },
+    {
+     "type": "TaskCompleted",
+     "id": "task-gap-runbook",
+     "source": "runbook",
+     "target": "network-timeout",
+     "retries": 0
+    },
+    {
+     "type": "ReplanCheck",
+     "round": 1,
+     "is_sufficient": true
+    },
+    {
+     "type": "AnalysisSkipped",
+     "reason": "analysis task 0개"
+    },
+    {
+     "type": "DraftWritten",
+     "attempt": 1,
+     "length": 407
+    },
+    {
+     "type": "Validation",
+     "attempt": 1,
+     "verdict": "합격"
+    },
+    {
+     "type": "Finalize",
+     "pipeline": "incident-v2"
+    }
+   ],
+   "metadata": {
+    "route": "incident",
+    "task_count": 3,
+    "gate_removed": 1,
+    "replan_rounds": 1,
+    "retry_count": 0,
+    "parallel_elapsed": 0.36,
+    "validation_attempts": 1,
+    "unknown_systems": [],
+    "grounding_issues": [],
+    "runbook_method": "tfidf",
+    "cost_usd": 0.003406,
+    "llm_backend": "ollama",
+    "supervisor_version": "v2",
+    "instance_id": 4489818048,
+    "langsmith_run_id": null
+   },
+   "missing": [],
+   "extra": [],
+   "runbook_ok": true,
+   "flags": []
+  },
+  {
+   "id": 3,
+   "query": "web-01 CPU 급증, auth-service 커넥션 풀도 같이 확인해줘",
+   "elapsed_s": 9.2,
+   "route": "incident",
+   "route_ok": true,
+   "cost_usd": 0.003386,
+   "retry_count": 0,
+   "validation_attempts": 1,
+   "probed": [
+    "web-01",
+    "auth-service"
+   ],
+   "runbooks": [
+    "high-latency"
+   ],
+   "reply": "1) web-01의 CPU 사용률은 39.5%로 정상 범위 내이며, 알림은 0건으로 이상 없음.  \n2) auth-service의 CPU 사용률은 81.8%, 메모리 사용률 62.9%로 과부하 상태. 알림 2건 중 'connection pool 92% used'가 확인됨.  \n3) 커넥션 풀 사용률이 92%로 90%를 초과하므로, 풀 크기 확장 또는 느린 쿼리/외부 호출 타임아웃 적용 필요. 추가 확인 필요.",
+   "events": [
+    {
+     "type": "RouteDecided",
+     "route": "incident"
+    },
+    {
+     "type": "PlanCreated",
+     "task_count": 3,
+     "targets": [
+      "web-01",
+      "auth-service"
+     ],
+     "target_source": "query"
+    },
+    {
+     "type": "GateApplied",
+     "removed_analysis_tasks": 0
+    },
+    {
+     "type": "TaskCompleted",
+     "id": "task-0",
+     "source": "monitoring",
+     "target": "web-01",
+     "retries": 0
+    },
+    {
+     "type": "TaskCompleted",
+     "id": "task-1",
+     "source": "monitoring",
+     "target": "auth-service",
+     "retries": 0
+    },
+    {
+     "type": "ReplanCheck",
+     "round": 0,
+     "is_sufficient": false,
+     "gap_task": "task-gap-runbook",
+     "target": "high-latency",
+     "method": "tfidf",
+     "scores": [
+      [
+       "high-latency",
+       1.095
+      ],
+      [
+       "cpu-spike",
+       0.807
+      ],
+      [
+       "db-down",
+       0.433
+      ]
+     ]
+    },
+    {
+     "type": "TaskCompleted",
+     "id": "task-gap-runbook",
+     "source": "runbook",
+     "target": "high-latency",
+     "retries": 0
+    },
+    {
+     "type": "ReplanCheck",
+     "round": 1,
+     "is_sufficient": true
+    },
+    {
+     "type": "AnalysisCompleted",
+     "length": 9
+    },
+    {
+     "type": "DraftWritten",
+     "attempt": 1,
+     "length": 230
+    },
+    {
+     "type": "Validation",
+     "attempt": 1,
+     "verdict": "합격"
+    },
+    {
+     "type": "Finalize",
+     "pipeline": "incident-v2"
+    }
+   ],
+   "metadata": {
+    "route": "incident",
+    "task_count": 4,
+    "gate_removed": 0,
+    "replan_rounds": 1,
+    "retry_count": 0,
+    "parallel_elapsed": 0.36,
+    "validation_attempts": 1,
+    "unknown_systems": [],
+    "grounding_issues": [],
+    "runbook_method": "tfidf",
+    "cost_usd": 0.003386,
+    "llm_backend": "ollama",
+    "supervisor_version": "v2",
+    "instance_id": 4489818048,
+    "langsmith_run_id": null
+   },
+   "missing": [],
+   "extra": [],
+   "runbook_ok": true,
+   "flags": []
+  },
+  {
+   "id": 4,
+   "query": "payments-service랑 cache-service 둘 다 저하됐는데 공통 원인이 있는지 분석해줘",
+   "elapsed_s": 11.3,
+   "route": "incident",
+   "route_ok": true,
+   "cost_usd": 0.003592,
+   "retry_count": 0,
+   "validation_attempts": 1,
+   "probed": [
+    "payments-service",
+    "cache-service"
+   ],
+   "runbooks": [
+    "memory-leak"
+   ],
+   "reply": "1) payments-service와 cache-service 모두 상태가 degraded로 확인되었으며, 공통 원인으로는 메모리 사용률의 이상 상승이 의심된다.  \n2) payments-service는 CPU 사용률 91.7%로 과부하 상태이며, cache-service는 메모리 사용률 91.9%로 OOM 직전 상태로 확인되었다.  \n3) 메모리 누수 여부를 확인하기 위해 힙 덤프 또는 프로파일링 도구를 사용해 어떤 객체가 계속 쌓이는지 분석해야 하며, 최근 배포에 캐시 무제한 증가, 커넥션 미반환, 이벤트 리스너 중복 등록 등이 있었는지 점검해야 한다.",
+   "events": [
+    {
+     "type": "RouteDecided",
+     "route": "incident"
+    },
+    {
+     "type": "PlanCreated",
+     "task_count": 3,
+     "targets": [
+      "payments-service",
+      "cache-service"
+     ],
+     "target_source": "query"
+    },
+    {
+     "type": "GateApplied",
+     "removed_analysis_tasks": 0
+    },
+    {
+     "type": "TaskCompleted",
+     "id": "task-0",
+     "source": "monitoring",
+     "target": "payments-service",
+     "retries": 0
+    },
+    {
+     "type": "TaskCompleted",
+     "id": "task-1",
+     "source": "monitoring",
+     "target": "cache-service",
+     "retries": 0
+    },
+    {
+     "type": "ReplanCheck",
+     "round": 0,
+     "is_sufficient": false,
+     "gap_task": "task-gap-runbook",
+     "target": "memory-leak",
+     "method": "tfidf",
+     "scores": [
+      [
+       "memory-leak",
+       0.886
+      ],
+      [
+       "cpu-spike",
+       0.881
+      ],
+      [
+       "high-latency",
+       0.271
+      ]
+     ]
+    },
+    {
+     "type": "TaskCompleted",
+     "id": "task-gap-runbook",
+     "source": "runbook",
+     "target": "memory-leak",
+     "retries": 0
+    },
+    {
+     "type": "ReplanCheck",
+     "round": 1,
+     "is_sufficient": true
+    },
+    {
+     "type": "AnalysisCompleted",
+     "length": 9
+    },
+    {
+     "type": "DraftWritten",
+     "attempt": 1,
+     "length": 314
+    },
+    {
+     "type": "Validation",
+     "attempt": 1,
+     "verdict": "합격"
+    },
+    {
+     "type": "Finalize",
+     "pipeline": "incident-v2"
+    }
+   ],
+   "metadata": {
+    "route": "incident",
+    "task_count": 4,
+    "gate_removed": 0,
+    "replan_rounds": 1,
+    "retry_count": 0,
+    "parallel_elapsed": 0.35,
+    "validation_attempts": 1,
+    "unknown_systems": [],
+    "grounding_issues": [],
+    "runbook_method": "tfidf",
+    "cost_usd": 0.003592,
+    "llm_backend": "ollama",
+    "supervisor_version": "v2",
+    "instance_id": 4489818048,
+    "langsmith_run_id": null
+   },
+   "missing": [],
+   "extra": [],
+   "runbook_ok": true,
+   "flags": []
+  },
+  {
+   "id": 5,
+   "query": "로그인 응답이 느려요, 원인 확인해주세요",
+   "elapsed_s": 9.4,
+   "route": "incident",
+   "route_ok": true,
+   "cost_usd": 0.003108,
+   "retry_count": 0,
+   "validation_attempts": 1,
+   "probed": [
+    "auth-service"
+   ],
+   "runbooks": [
+    "high-latency"
+   ],
+   "reply": "1) auth-service의 p95 지연시간이 2.4s로 임계치(1.0s)를 초과하고 있으며, 커넥션 풀 사용률이 92%로 높습니다.  \n2) 커넥션 풀 사용률이 90%를 넘으므로 풀 크기 확장 또는 느린 쿼리/외부 호출에 타임아웃을 적용해야 합니다.  \n3) 5분 내 p95 지연시간이 1.0s 이하로 내려오지 않으면 캐시 계층 또는 읽기 복제본을 통해 트래픽을 분산해야 합니다.",
+   "events": [
+    {
+     "type": "RouteDecided",
+     "route": "incident"
+    },
+    {
+     "type": "PlanCreated",
+     "task_count": 1,
+     "targets": [
+      "auth-service"
+     ],
+     "target_source": "alias"
+    },
+    {
+     "type": "GateApplied",
+     "removed_analysis_tasks": 0
+    },
+    {
+     "type": "TaskCompleted",
+     "id": "task-0",
+     "source": "monitoring",
+     "target": "auth-service",
+     "retries": 0
+    },
+    {
+     "type": "ReplanCheck",
+     "round": 0,
+     "is_sufficient": false,
+     "gap_task": "task-gap-runbook",
+     "target": "high-latency",
+     "method": "tfidf",
+     "scores": [
+      [
+       "high-latency",
+       1.188
+      ],
+      [
+       "cpu-spike",
+       0.273
+      ],
+      [
+       "disk-full",
+       0.218
+      ]
+     ]
+    },
+    {
+     "type": "TaskCompleted",
+     "id": "task-gap-runbook",
+     "source": "runbook",
+     "target": "high-latency",
+     "retries": 0
+    },
+    {
+     "type": "ReplanCheck",
+     "round": 1,
+     "is_sufficient": true
+    },
+    {
+     "type": "AnalysisSkipped",
+     "reason": "analysis task 0개"
+    },
+    {
+     "type": "DraftWritten",
+     "attempt": 1,
+     "length": 214
+    },
+    {
+     "type": "Validation",
+     "attempt": 1,
+     "verdict": "합격"
+    },
+    {
+     "type": "Finalize",
+     "pipeline": "incident-v2"
+    }
+   ],
+   "metadata": {
+    "route": "incident",
+    "task_count": 2,
+    "gate_removed": 0,
+    "replan_rounds": 1,
+    "retry_count": 0,
+    "parallel_elapsed": 0.35,
+    "validation_attempts": 1,
+    "unknown_systems": [],
+    "grounding_issues": [],
+    "runbook_method": "tfidf",
+    "cost_usd": 0.003108,
+    "llm_backend": "ollama",
+    "supervisor_version": "v2",
+    "instance_id": 4489818048,
+    "langsmith_run_id": null
+   },
+   "missing": [],
+   "extra": [],
+   "runbook_ok": true,
+   "flags": []
+  },
+  {
+   "id": 6,
+   "query": "billing-service 응답이 느려요",
+   "elapsed_s": 0.2,
+   "route": "incident",
+   "route_ok": true,
+   "cost_usd": 2.1e-05,
+   "retry_count": 0,
+   "validation_attempts": 0,
+   "probed": [],
+   "runbooks": [],
+   "reply": "billing-service는(은) 현재 모니터링 대상이 아니라 상태를 조회할 수 없습니다. 조회 가능한 시스템: auth-service, cache-service, gateway-service, log-service, payments-service, web-01. 위 시스템 중 관련된 것이 있으면 이름을 함께 알려 주세요.",
+   "events": [
+    {
+     "type": "RouteDecided",
+     "route": "incident"
+    },
+    {
+     "type": "PlanCreated",
+     "task_count": 0,
+     "targets": [],
+     "unknown_systems": [
+      "billing-service"
+     ]
+    },
+    {
+     "type": "Finalize",
+     "pipeline": "unknown-system"
+    }
+   ],
+   "metadata": {
+    "route": "incident",
+    "task_count": 0,
+    "gate_removed": 0,
+    "replan_rounds": 0,
+    "retry_count": 0,
+    "parallel_elapsed": null,
+    "validation_attempts": 0,
+    "unknown_systems": [
+     "billing-service"
+    ],
+    "grounding_issues": [],
+    "runbook_method": null,
+    "cost_usd": 2.1e-05,
+    "llm_backend": "ollama",
+    "supervisor_version": "v2",
+    "instance_id": 4489818048,
+    "langsmith_run_id": null
+   },
+   "missing": [],
+   "extra": [],
+   "runbook_ok": true,
+   "unknown_ok": true,
+   "flags": []
+  },
+  {
+   "id": 7,
+   "query": "안녕, 너는 누구야?",
+   "elapsed_s": 0.2,
+   "route": "chat",
+   "route_ok": true,
+   "cost_usd": 3.7e-05,
+   "retry_count": 0,
+   "validation_attempts": 0,
+   "probed": [],
+   "runbooks": [],
+   "reply": "안녕하세요! 저는 운영 인시던트입니다.",
+   "events": [
+    {
+     "type": "RouteDecided",
+     "route": "chat"
+    },
+    {
+     "type": "Finalize",
+     "pipeline": "chat-direct"
+    }
+   ],
+   "metadata": {
+    "route": "chat",
+    "task_count": 0,
+    "gate_removed": 0,
+    "replan_rounds": 0,
+    "retry_count": 0,
+    "parallel_elapsed": null,
+    "validation_attempts": 0,
+    "unknown_systems": [],
+    "grounding_issues": [],
+    "runbook_method": null,
+    "cost_usd": 3.7e-05,
+    "llm_backend": "ollama",
+    "supervisor_version": "v2",
+    "instance_id": 4489818048,
+    "langsmith_run_id": null
+   }
+  },
+  {
+   "id": 8,
+   "query": "제 이름은 민수입니다",
+   "elapsed_s": 0.2,
+   "route": "chat",
+   "route_ok": true,
+   "cost_usd": 3.7e-05,
+   "retry_count": 0,
+   "validation_attempts": 0,
+   "probed": [],
+   "runbooks": [],
+   "reply": "민수님의 이름을 정확히 기억해 드릴게.",
+   "events": [
+    {
+     "type": "RouteDecided",
+     "route": "chat",
+     "llm_route": "incident"
+    },
+    {
+     "type": "Finalize",
+     "pipeline": "chat-direct"
+    }
+   ],
+   "metadata": {
+    "route": "chat",
+    "task_count": 0,
+    "gate_removed": 0,
+    "replan_rounds": 0,
+    "retry_count": 0,
+    "parallel_elapsed": null,
+    "validation_attempts": 0,
+    "unknown_systems": [],
+    "grounding_issues": [],
+    "runbook_method": null,
+    "cost_usd": 3.7e-05,
+    "llm_backend": "ollama",
+    "supervisor_version": "v2",
+    "instance_id": 4489818048,
+    "langsmith_run_id": null
+   }
+  },
+  {
+   "id": 9,
+   "query": "제 이름이 뭐였죠?",
+   "elapsed_s": 0.2,
+   "route": "chat",
+   "route_ok": true,
+   "cost_usd": 4.2e-05,
+   "retry_count": 0,
+   "validation_attempts": 0,
+   "probed": [],
+   "runbooks": [],
+   "reply": "민수님의 이름을 정확히 기억해 드릴게.",
+   "events": [
+    {
+     "type": "RouteDecided",
+     "route": "chat"
+    },
+    {
+     "type": "Finalize",
+     "pipeline": "chat-direct"
+    }
+   ],
+   "metadata": {
+    "route": "chat",
+    "task_count": 0,
+    "gate_removed": 0,
+    "replan_rounds": 0,
+    "retry_count": 0,
+    "parallel_elapsed": null,
+    "validation_attempts": 0,
+    "unknown_systems": [],
+    "grounding_issues": [],
+    "runbook_method": null,
+    "cost_usd": 4.2e-05,
+    "llm_backend": "ollama",
+    "supervisor_version": "v2",
+    "instance_id": 4489818048,
+    "langsmith_run_id": null
+   },
+   "reply_ok": true
+  }
+ ]
+}
