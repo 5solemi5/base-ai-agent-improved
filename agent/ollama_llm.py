@@ -208,6 +208,11 @@ def build_write_prompt(query: str, collected: list[dict], feedback: str | None) 
             facts.append(f"- 모니터링 {d['system_name']}: 상태={d['status']}, "
                          f"CPU {d['cpu_percent']}%, 메모리 {d['memory_percent']}%, "
                          f"알림 {len(d['alerts'])}건 {d['alerts']}")
+        elif c["source"] == "log":   # [개선 10] 로그 분석 서브에이전트의 요약
+            d = c["data"]
+            top = "; ".join(f"{t['level']} {t['message']} ×{t['count']}" for t in d["top"])
+            facts.append(f"- 로그 {d['system_name']}: ERROR {d['error_count']}건, "
+                         f"WARN {d['warn_count']}건 — {top or '특이 로그 없음'}")
         elif c["source"] == "runbook":
             facts.append(f"- runbook 발췌:\n{c['data'].strip()}")
         elif c["source"] == "analysis":

@@ -31,11 +31,11 @@ def test_multi_system_query_investigates_all(fake_graph):
     assert runbook == ["network-timeout"]
 
 
-def test_replan_event_records_retriever(fake_graph):
+def test_runbook_agent_records_retriever(fake_graph):
     graph, _ = fake_graph
     result = run(graph, "로그인 응답이 느려요, 원인 확인해주세요")
-    replan = [e for e in result["events"] if e["type"] == "ReplanCheck" and not e["is_sufficient"]]
-    assert replan and replan[0]["method"] == "tfidf" and replan[0]["target"] == "high-latency"
+    picked = [e for e in result["events"] if e["type"] == "RunbookSelected"]
+    assert picked and picked[0]["method"] == "tfidf" and picked[0]["target"] == "high-latency"
 
 
 def test_validator_rejects_short_first_draft_then_passes(fake_graph):

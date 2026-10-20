@@ -1,0 +1,37 @@
+{
+  "_comment": "[개선 10] 로그 분석 에이전트용 샘플 로그 — get_recent_logs MCP Tool이 읽는다. monitoring.json의 알림과 같은 상황을 로그로 표현했다.",
+  "auth-service": [
+    {"ts": "10:38:12", "level": "WARN", "message": "DB connection pool wait 1800ms (pool 46/50)"},
+    {"ts": "10:39:40", "level": "ERROR", "message": "connection pool exhausted, request queued"},
+    {"ts": "10:40:05", "level": "ERROR", "message": "connection pool exhausted, request queued"},
+    {"ts": "10:40:31", "level": "WARN", "message": "slow query: SELECT * FROM sessions took 2100ms"},
+    {"ts": "10:41:02", "level": "INFO", "message": "health check ok"}
+  ],
+  "web-01": [
+    {"ts": "10:40:00", "level": "INFO", "message": "health check ok"},
+    {"ts": "10:41:00", "level": "INFO", "message": "health check ok"}
+  ],
+  "payments-service": [
+    {"ts": "09:58:03", "level": "INFO", "message": "deployed version v2.14.0"},
+    {"ts": "10:12:44", "level": "WARN", "message": "worker thread pool saturation 95%"},
+    {"ts": "10:30:19", "level": "ERROR", "message": "payments-service-3 request handler took 4200ms"},
+    {"ts": "10:35:51", "level": "ERROR", "message": "payments-service-3 request handler took 4200ms"},
+    {"ts": "10:40:27", "level": "WARN", "message": "retry storm detected: same order retried 3 times"}
+  ],
+  "cache-service": [
+    {"ts": "04:40:00", "level": "INFO", "message": "deployed version v3.1.0 (eviction policy changed)"},
+    {"ts": "08:15:10", "level": "WARN", "message": "heap usage 80%"},
+    {"ts": "10:20:42", "level": "WARN", "message": "GC pause 900ms"},
+    {"ts": "10:39:58", "level": "ERROR", "message": "heap usage 89%, eviction not keeping up"}
+  ],
+  "gateway-service": [
+    {"ts": "10:36:10", "level": "ERROR", "message": "upstream timeout to payments-service after 3000ms (504)"},
+    {"ts": "10:37:25", "level": "WARN", "message": "retry 2/3 to payments-service"},
+    {"ts": "10:38:44", "level": "ERROR", "message": "upstream timeout to payments-service after 3000ms (504)"},
+    {"ts": "10:39:03", "level": "WARN", "message": "packet loss 3% on link az-b"}
+  ],
+  "log-service": [
+    {"ts": "10:30:00", "level": "WARN", "message": "disk usage 93% on /var/log"},
+    {"ts": "10:41:12", "level": "ERROR", "message": "write failed: no space left on device (/var/log 95%)"}
+  ]
+}

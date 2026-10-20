@@ -7,6 +7,7 @@ FastAPI 백엔드(server.py)가 lifespan에서 이 파일을 subprocess(stdio)�
 - Tool    get_monitoring_status : 호출마다 값이 달라지는 동적 조회 → Tool이 맞다
 - Resource runbook://incident-response/{incident_type} : URI로 식별되는 정적 문서
 - Prompt  incident_analysis_prompt : 여러 Tool을 조합하는 표준 진단 절차를 강제
+- Tool    get_recent_logs : [개선 10] 최근 로그 조회 — 로그 분석 서브에이전트가 쓴다
 """
 import json
 import random
@@ -53,6 +54,31 @@ def get_monitoring_status(system_name: str) -> SystemStatus:
     )
 
 
+class LogLine(BaseModel):
+    ts: str = Field(description="시각 (HH:MM:SS)")
+    level: str = Field(description="INFO / WARN / ERROR")
+    message: str = Field(description="로그 메시지")
+
+
+class RecentLogs(BaseModel):
+    system_name: str = Field(description="시스템 이름")
+    lines: list[LogLine] = Field(default_factory=list, description="최근 로그 (오래된 순)")
+    error_count: int = Field(description="ERROR 줄 수")
+    warn_count: int = Field(description="WARN 줄 수")
+
+
+@mcp.tool()
+def get_recent_logs(system_name: str, min_level: str = "INFO", limit: int = 20) -> RecentLogs:
+    """[개선 10] 지정된 시스템의 최근 로그를 조회합니다. min_level=WARN이면 WARN·ERROR만 돌려줍니다."""
+    logs = json.loads((DATA_DIR / "logs.json").read_text(encoding="utf-8"))
+    order = {"INFO": 0, "WARN": 1, "ERROR": 2}
+    lines = [l for l in logs.get(system_name, [])
+             if order.get(l["level"], 0) >= order.get(min_level.upper(), 0)][-limit:]
+    return RecentLogs(system_name=system_name, lines=lines,
+                      error_count=sum(l["level"] == "ERROR" for l in lines),
+                      warn_count=sum(l["level"] == "WARN" for l in lines))
+
+
 @mcp.resource("runbook://incident-response/{incident_type}")
 def get_incident_runbook(incident_type: str) -> str:
     """특정 incident 유형의 runbook(정적 문서)을 반환합니다."""
@@ -73,8 +99,9 @@ def incident_analysis_prompt(system_name: str, symptom: str) -> str:
 
 ## 진단 절차 (반드시 순서대로 수행)
 1. get_monitoring_status Tool로 관련 시스템의 현재 상태를 조회하세요.
-2. 증상에 해당하는 runbook(runbook://incident-response/...)을 확인하세요.
-3. 위 정보를 종합해 가능한 원인과 권장 조치를 제시하세요.
+2. 저하된 시스템은 get_recent_logs Tool로 최근 WARN/ERROR 로그를 확인하세요.
+3. 증상에 해당하는 runbook(runbook://incident-response/...)을 확인하세요.
+4. 위 정보를 종합해 가능한 원인과 권장 조치를 제시하세요.
 """
 
 

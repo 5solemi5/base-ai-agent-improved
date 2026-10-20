@@ -121,7 +121,8 @@ def _metadata(result: dict, run_id: str | None) -> dict:
         "unknown_systems": result.get("unknown_systems", []),
         "grounding_issues": result.get("grounding_issues", []),
         "runbook_method": next((e.get("method") for e in result.get("events", [])
-                                if e.get("type") == "ReplanCheck" and e.get("method")), None),
+                                if e.get("type") == "RunbookSelected"), None),
+        "agents_called": result.get("agents_called", []),   # [개선 10]
         "cost_usd": result.get("cost_usd", 0.0),
         "llm_backend": app.state.llm_backend,
         "supervisor_version": app.state.deps.version,

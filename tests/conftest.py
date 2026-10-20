@@ -15,6 +15,7 @@ os.environ["LANGCHAIN_TRACING_V2"] = "false"
 os.environ.setdefault("LANGSMITH_TRACING", "false")
 
 MONITORING = json.loads((ROOT / "data" / "monitoring.json").read_text(encoding="utf-8"))
+LOGS = json.loads((ROOT / "data" / "logs.json").read_text(encoding="utf-8"))
 
 
 class StubMCP:
@@ -33,6 +34,12 @@ class StubMCP:
         return f"시스템: {arguments['system_name']}\n증상: {arguments['symptom']}"
 
     async def call_tool(self, name, arguments, server="ops"):
+        if name == "get_recent_logs":   # [개선 10] 로그 분석 서브에이전트용
+            self.calls.append(("get_recent_logs", arguments["system_name"]))
+            lines = [l for l in LOGS.get(arguments["system_name"], []) if l["level"] != "INFO"]
+            return {"system_name": arguments["system_name"], "lines": lines,
+                    "error_count": sum(l["level"] == "ERROR" for l in lines),
+                    "warn_count": sum(l["level"] == "WARN" for l in lines)}
         self.calls.append(("call_tool", arguments["system_name"]))
         base = MONITORING.get(arguments["system_name"])
         if base is None:

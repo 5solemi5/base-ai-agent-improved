@@ -1,9 +1,9 @@
 """v2 Supervisor — 실제 langgraph.StateGraph (Wave 4·5·6·7·8·10b·15 통합).
 
 route → (chat 직행 | incident 파이프라인)
-incident: plan(MCP Prompt 절차 반영) → gate(권위 게이트) → research(가드+병렬+재시도)
-          → replan_check(부족 시 gap task 후 재조사) → analysis(needs_analysis=True일 때만
-          실제 실행) → write → validate(반려 시 재작성) → finalize
+incident: plan(MCP Prompt 절차 반영) → gate(권위 게이트)
+          → research_supervisor ⇄ {metrics_agent, log_agent, runbook_agent}  ([개선 10] 서브에이전트)
+          → analysis(needs_analysis=True일 때만 실제 실행) → write → validate(반려 시 재작성) → finalize
 
 모든 노드는 SupervisorDeps를 functools.partial로 주입받는 순수 함수다(Wave 13).
 각 노드는 @traceable로 LangSmith에 계층 트리로 기록된다.
@@ -12,10 +12,12 @@ incident: plan(MCP Prompt 절차 반영) → gate(권위 게이트) → research
   1 성능   : route/plan/analyze의 동기 LLM 호출을 asyncio.to_thread로 — 이벤트 루프 블로킹 해소
   2 정확도 : 조사 대상은 agent/systems.py가 쿼리 기준으로 결정, 모니터링 대상이 아닌 시스템만
              물으면 unknown_system 노드에서 조사 없이 정직하게 안내(다른 시스템으로 바꿔치기 금지)
-  3 RAG    : replan_check의 incident_type 선택을 키워드 규칙 → runbook 벡터 검색(agent/runbook_retriever.py)
+  3 RAG    : incident_type 선택을(현재는 runbook_agent 안) 키워드 규칙 → runbook 벡터 검색(agent/runbook_retriever.py)
   4 검증   : validate가 형식 + 근거(agent/grounding.py)를 함께 검사, 최대 시도 후 통과 시 경고 문구 첨부
   8 모듈화 : 노드 구현은 agent/nodes/ 패키지로 옮기고, 이 파일에는 '노드 연결(엣지)'만 남겼다
   9 되묻기 : 시스템을 특정할 수 없으면 기본 시스템(auth-service)으로 찍지 않고 clarify 노드에서 되묻는다
+  10 멀티에이전트 : research + replan_check를 메트릭·로그·런북 전문 서브에이전트(compiled subgraph) 3개와
+             이들을 지휘하는 research_supervisor로 교체 (agent/research/)
 """
 from functools import partial
 
@@ -24,11 +26,15 @@ from langgraph.graph import END, StateGraph
 from .deps import SupervisorDeps
 from .nodes.analysis import analysis_node
 from .nodes.planning import clarify_node, gate_node, plan_node, unknown_system_node
-from .nodes.research import RETRIEVER, replan_check_node, research_node
 from .nodes.routing import chat_answer_node, route_gate, route_node
 from .nodes.state import AgentState
 from .nodes.writing import (MAX_VALIDATION_ATTEMPTS, finalize_node, validate_node,
                             write_node)
+from .research.log_agent import build_log_agent
+from .research.metrics_agent import build_metrics_agent
+from .research.runbook_agent import RETRIEVER, build_runbook_agent
+from .research.supervisor import (AGENTS, log_agent_node, metrics_agent_node,
+                                  research_supervisor_node, runbook_agent_node)
 
 # 예전 import 경로(from agent.graph import route_gate 등)를 쓰는 코드가 그대로 동작하게 다시 내보낸다
 __all__ = ["build_graph", "AgentState", "route_gate", "RETRIEVER", "MAX_VALIDATION_ATTEMPTS"]
@@ -46,9 +52,9 @@ def _after_plan(state: AgentState) -> str:
     return "gate" if has_research else "unknown_system"
 
 
-def _after_replan_check(state: AgentState) -> str:
-    last = state["events"][-1]
-    return "analysis" if last.get("is_sufficient") else "research"
+def _after_supervisor(state: AgentState) -> str:
+    """[개선 10] research_supervisor가 고른 서브에이전트로, 다 끝났으면 analysis로."""
+    return "analysis" if state["next_agent"] == "done" else state["next_agent"]
 
 
 def _after_validate(state: AgentState) -> str:
@@ -64,8 +70,11 @@ def build_graph(deps: SupervisorDeps):
     g.add_node("unknown_system", node(unknown_system_node))
     g.add_node("clarify", node(clarify_node))
     g.add_node("gate", node(gate_node))
-    g.add_node("research", node(research_node))
-    g.add_node("replan_check", node(replan_check_node))
+    # [개선 10] 서브에이전트는 각자 compile된 StateGraph — 어댑터 노드가 메인 상태와 주고받는다
+    g.add_node("research_supervisor", node(research_supervisor_node))
+    g.add_node("metrics_agent", partial(metrics_agent_node, deps=deps, agent=build_metrics_agent(deps.mcp)))
+    g.add_node("log_agent", partial(log_agent_node, deps=deps, agent=build_log_agent(deps.mcp)))
+    g.add_node("runbook_agent", partial(runbook_agent_node, deps=deps, agent=build_runbook_agent(deps.mcp)))
     g.add_node("analysis", node(analysis_node))
     g.add_node("write", node(write_node))
     g.add_node("validate", node(validate_node))
@@ -80,10 +89,11 @@ def build_graph(deps: SupervisorDeps):
                              "clarify": "clarify"})
     g.add_edge("unknown_system", END)
     g.add_edge("clarify", END)
-    g.add_edge("gate", "research")
-    g.add_edge("research", "replan_check")
-    g.add_conditional_edges("replan_check", _after_replan_check,
-                            {"analysis": "analysis", "research": "research"})
+    g.add_edge("gate", "research_supervisor")
+    g.add_conditional_edges("research_supervisor", _after_supervisor,
+                            {**{a: a for a in AGENTS}, "analysis": "analysis"})
+    for a in AGENTS:   # 서브에이전트가 끝나면 항상 supervisor로 돌아가 다음을 고른다
+        g.add_edge(a, "research_supervisor")
     g.add_edge("analysis", "write")
     g.add_edge("write", "validate")
     g.add_conditional_edges("validate", _after_validate,

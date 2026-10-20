@@ -115,16 +115,24 @@
 <script>
 const { createApp, ref, reactive, nextTick } = Vue;
 
+const AGENT_NAMES = { metrics_agent: '메트릭 분석 에이전트', log_agent: '로그 분석 에이전트',
+                      runbook_agent: '런북 분석 에이전트' };
+
 const STEP_LABELS = {
   // [개선 9] 되묻기에 대한 대답이면 이전 증상과 합쳐 진단을 이어간다
   RouteDecided: e => e.resumed_query ? `이전 증상과 합쳐 진단 재개: "${e.resumed_query}"` : null,
   ClarifyAsked: () => '조사 대상이 불명확 → 어느 시스템인지 되묻기',
   PlanCreated: e => `계획 수립: 할 일 ${e.task_count}가지${e.targets?.length ? ` (시스템: ${e.targets.join(', ')})` : ''}`,
   GateApplied: e => e.removed_analysis_tasks ? `불필요한 작업 ${e.removed_analysis_tasks}건 제거` : null,
+  // [개선 10] 서브에이전트 단위로 진행 상황을 보여준다
+  SupervisorDecision: e => e.next === 'done' ? '조사 완료 → 분석 단계로'
+      : `감독자 → ${AGENT_NAMES[e.next]} 호출` + (e.skipped ? ' (저하 시스템 없음 → 로그 분석 생략)' : ''),
   TaskCompleted: e => (e.source === 'monitoring'
-      ? `모니터링 지표 확인 (시스템: ${e.target})`
-      : `대응 매뉴얼(runbook) 조회 (장애유형: ${e.target})`) + (e.retries ? ' (재시도 성공)' : ''),
-  ReplanCheck: e => e.is_sufficient ? null : `정보 부족 → 장애유형 "${e.target}"로 추가 조사` + (e.method ? ` (${e.method} 검색)` : ''),
+      ? `  · 모니터링 지표 확인 (시스템: ${e.target})`
+      : e.source === 'log'
+      ? `  · 최근 로그 확인 (시스템: ${e.target}, ERROR ${e.errors} · WARN ${e.warns})`
+      : `  · 대응 매뉴얼(runbook) 조회 (장애유형: ${e.target})`) + (e.retries ? ' (재시도 성공)' : ''),
+  RunbookSelected: e => `  · 증상·지표·로그로 장애유형 검색 → "${e.target}" (${e.method})`,
   DraftWritten: e => `답변 초안 작성 (시도 ${e.attempt})`,
   // [개선 5] 원본은 '합격(최대 시도 도달 — 통과 처리)'도 '검수 반려'로 표시했다
   Validation: e => e.verdict === '합격' ? '검수 통과'
