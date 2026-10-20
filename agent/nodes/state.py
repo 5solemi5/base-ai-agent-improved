@@ -22,6 +22,7 @@ class AgentState(TypedDict, total=False):
     cost_usd: float
     events: list[dict]
     unknown_systems: list[str]   # [개선 2] 쿼리에 나왔지만 모니터링 대상이 아닌 시스템
+    needs_clarification: bool    # [개선 9] 조사 대상을 정할 수 없어 사용자에게 되물어야 함
     grounding_issues: list[str]  # [개선 4] 마지막 검증에서 남은 근거 문제(최대 시도 후 통과 시 안내)
 
 

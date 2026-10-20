@@ -75,3 +75,24 @@ def test_v1_rollback_investigates_incident(stub_mcp):
     deps = SupervisorDeps(PlainChat("f", 0.0), QualityLLM("q", 0.0), stub_mcp, None, "v1")
     result = asyncio.run(run_v1(deps, "로그인 응답이 느려요", "t", []))
     assert any(e["type"] == "TaskCompleted" for e in result["events"])
+
+
+def test_unclear_target_asks_back_then_resumes(fake_graph):
+    # [개선 9] 시스템 단서가 없으면 auth-service로 찍지 않고 되묻는다 → 다음 턴에 시스템을 말하면 이어서 진단
+    graph, mcp = fake_graph
+    first = run(graph, "응답이 너무 느려요, 원인 확인해주세요")
+    assert probed(first) == [] and first["final"].startswith("조사할 시스템을 먼저 알려 주세요.")
+    assert not any(c[0] == "call_tool" for c in mcp.calls)
+    history = [{"role": "user", "content": "응답이 너무 느려요, 원인 확인해주세요"},
+               {"role": "assistant", "content": first["final"]}]
+    second = run(graph, "payments-service요", history)
+    assert second["route"] == "incident" and "payments-service" in probed(second)
+    assert "응답이 너무 느려요" in second["query"]
+
+
+def test_clarify_answer_without_system_routes_normally(fake_graph):
+    graph, _ = fake_graph
+    history = [{"role": "user", "content": "응답이 너무 느려요"},
+               {"role": "assistant", "content": "조사할 시스템을 먼저 알려 주세요. …"}]
+    result = run(graph, "잘 모르겠어요", history)
+    assert result["route"] == "chat"

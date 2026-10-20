@@ -15,6 +15,7 @@ incident: plan(MCP Prompt 절차 반영) → gate(권위 게이트) → research
   3 RAG    : replan_check의 incident_type 선택을 키워드 규칙 → runbook 벡터 검색(agent/runbook_retriever.py)
   4 검증   : validate가 형식 + 근거(agent/grounding.py)를 함께 검사, 최대 시도 후 통과 시 경고 문구 첨부
   8 모듈화 : 노드 구현은 agent/nodes/ 패키지로 옮기고, 이 파일에는 '노드 연결(엣지)'만 남겼다
+  9 되묻기 : 시스템을 특정할 수 없으면 기본 시스템(auth-service)으로 찍지 않고 clarify 노드에서 되묻는다
 """
 from functools import partial
 
@@ -22,7 +23,7 @@ from langgraph.graph import END, StateGraph
 
 from .deps import SupervisorDeps
 from .nodes.analysis import analysis_node
-from .nodes.planning import gate_node, plan_node, unknown_system_node
+from .nodes.planning import clarify_node, gate_node, plan_node, unknown_system_node
 from .nodes.research import RETRIEVER, replan_check_node, research_node
 from .nodes.routing import chat_answer_node, route_gate, route_node
 from .nodes.state import AgentState
@@ -39,6 +40,8 @@ def _after_route(state: AgentState) -> str:
 
 def _after_plan(state: AgentState) -> str:
     """[개선 2] 조사할 시스템이 하나도 없으면(모니터링 대상이 아닌 시스템만 물음) 안내 노드로."""
+    if state.get("needs_clarification"):   # [개선 9] 대상 불명확 → 되묻기
+        return "clarify"
     has_research = any(t["agent"] == "research" for t in state.get("tasks", []))
     return "gate" if has_research else "unknown_system"
 
@@ -59,6 +62,7 @@ def build_graph(deps: SupervisorDeps):
     g.add_node("chat_answer", node(chat_answer_node))
     g.add_node("plan", node(plan_node))
     g.add_node("unknown_system", node(unknown_system_node))
+    g.add_node("clarify", node(clarify_node))
     g.add_node("gate", node(gate_node))
     g.add_node("research", node(research_node))
     g.add_node("replan_check", node(replan_check_node))
@@ -72,8 +76,10 @@ def build_graph(deps: SupervisorDeps):
                             {"chat_answer": "chat_answer", "plan": "plan"})
     g.add_edge("chat_answer", END)
     g.add_conditional_edges("plan", _after_plan,
-                            {"gate": "gate", "unknown_system": "unknown_system"})
+                            {"gate": "gate", "unknown_system": "unknown_system",
+                             "clarify": "clarify"})
     g.add_edge("unknown_system", END)
+    g.add_edge("clarify", END)
     g.add_edge("gate", "research")
     g.add_edge("research", "replan_check")
     g.add_conditional_edges("replan_check", _after_replan_check,

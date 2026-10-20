@@ -116,6 +116,9 @@
 const { createApp, ref, reactive, nextTick } = Vue;
 
 const STEP_LABELS = {
+  // [개선 9] 되묻기에 대한 대답이면 이전 증상과 합쳐 진단을 이어간다
+  RouteDecided: e => e.resumed_query ? `이전 증상과 합쳐 진단 재개: "${e.resumed_query}"` : null,
+  ClarifyAsked: () => '조사 대상이 불명확 → 어느 시스템인지 되묻기',
   PlanCreated: e => `계획 수립: 할 일 ${e.task_count}가지${e.targets?.length ? ` (시스템: ${e.targets.join(', ')})` : ''}`,
   GateApplied: e => e.removed_analysis_tasks ? `불필요한 작업 ${e.removed_analysis_tasks}건 제거` : null,
   TaskCompleted: e => (e.source === 'monitoring'
