@@ -1,0 +1,17 @@
+[
+  {"id": 1, "query": "payments-service 결제 응답이 느려지고 CPU가 치솟았어요, 원인 확인해주세요",
+   "route": "incident", "systems": ["payments-service"], "runbooks": ["cpu-spike"]},
+  {"id": 2, "query": "gateway-service에서 payments-service로 가는 요청이 타임아웃 나고 있어요",
+   "route": "incident", "systems": ["gateway-service", "payments-service"], "runbooks": ["network-timeout"]},
+  {"id": 3, "query": "web-01 CPU 급증, auth-service 커넥션 풀도 같이 확인해줘",
+   "route": "incident", "systems": ["web-01", "auth-service"], "runbooks": ["cpu-spike", "high-latency"]},
+  {"id": 4, "query": "payments-service랑 cache-service 둘 다 저하됐는데 공통 원인이 있는지 분석해줘",
+   "route": "incident", "systems": ["payments-service", "cache-service"], "runbooks": ["cpu-spike", "memory-leak"]},
+  {"id": 5, "query": "로그인 응답이 느려요, 원인 확인해주세요",
+   "route": "incident", "systems": ["auth-service"], "runbooks": ["high-latency"]},
+  {"id": 6, "query": "billing-service 응답이 느려요",
+   "route": "incident", "systems": [], "runbooks": [], "unknown": ["billing-service"]},
+  {"id": 7, "query": "안녕, 너는 누구야?", "route": "chat"},
+  {"id": 8, "query": "제 이름은 민수입니다", "route": "chat", "thread": "name"},
+  {"id": 9, "query": "제 이름이 뭐였죠?", "route": "chat", "thread": "name", "expect_in_reply": "민수"}
+]
