@@ -75,6 +75,17 @@
     color: white; font-size: 14px; cursor: pointer;
   }
   button:disabled { background: #3a3a52; cursor: default; }
+  /* [개선 11] 위험 조치 승인 카드 */
+  .approval {
+    flex-shrink: 0; max-width: 70%; background: #2a2333; border: 1px solid #b07a2a;
+    border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.5;
+  }
+  .approval h4 { margin: 0 0 6px; font-size: 14px; color: #f0b25a; }
+  .approval li { margin: 2px 0; }
+  .approval .actions { display: flex; gap: 8px; margin-top: 10px; }
+  .approval .approve { background: #2f8f4e; }
+  .approval .reject { background: #a33a3a; }
+  .approval .decided { margin-top: 8px; color: #c9c9e8; }
 </style>
 </head>
 <body>
@@ -92,6 +103,16 @@
 
       <div v-else-if="item.kind === 'agent'" class="row agent">
         <div class="bubble">{{ item.text }}</div>
+      </div>
+
+      <div v-else-if="item.kind === 'approval'" class="approval">
+        <h4>⏸ 운영자 승인 필요 — 위험 조치 {{ item.actions.length }}건</h4>
+        <ul><li v-for="(a, i) in item.actions" :key="i"><b>{{ a.action }}</b>: {{ a.sentence }}</li></ul>
+        <div v-if="item.decided === null" class="actions">
+          <button class="approve" @click="decide(item, true)">승인</button>
+          <button class="reject" @click="decide(item, false)">거절 (해당 조치 제외)</button>
+        </div>
+        <div v-else class="decided">{{ item.decided ? '✅ 승인함' : '⛔ 거절함' }}</div>
       </div>
 
       <details v-else-if="item.kind === 'prompt'" class="prompt-box">
@@ -138,6 +159,8 @@ const STEP_LABELS = {
   Validation: e => e.verdict === '합격' ? '검수 통과'
       : e.verdict.startsWith('합격') ? '검수 최대 횟수 도달 → 경고와 함께 통과'
       : '검수 반려 → 다시 작성' + (e.grounding_issues?.length ? ` (근거 문제 ${e.grounding_issues.length}건)` : ''),
+  ApprovalSkipped: e => e.risky && !e.hitl ? `위험 조치 ${e.risky}건 (승인 기능 꺼짐 → 그대로 진행)` : null,
+  ApprovalDecided: e => e.approved ? '운영자 승인 → 답변 확정' : '운영자 거절 → 위험 조치를 답변에서 제외',
   Finalize: () => '최종 답변 완성',
 };
 
@@ -179,7 +202,20 @@ createApp({
       log.value.push(stepsItem);
       scrollToBottom();
 
-      const url = `/chat/stream?message=${encodeURIComponent(text)}&thread_id=${encodeURIComponent(thread)}`;
+      runStream(`/chat/stream?message=${encodeURIComponent(text)}&thread_id=${encodeURIComponent(thread)}`, stepsItem);
+    }
+
+    // [개선 11] 승인 카드의 버튼 → 멈춘 그래프를 이어서 실행하는 스트림을 연다
+    function decide(item, approved) {
+      item.decided = approved;
+      sending.value = true;
+      const stepsItem = reactive({ id: nextId++, kind: 'steps', steps: [], done: false, failed: false });
+      log.value.push(stepsItem);
+      runStream(`/chat/approve/stream?thread_id=${encodeURIComponent(thread)}&approved=${approved}`, stepsItem);
+    }
+
+    // SSE 한 번을 처리한다 — 새 질문(/chat/stream)과 승인 후 재개(/chat/approve/stream)가 같이 쓴다
+    function runStream(url, stepsItem) {
       const es = new EventSource(url);
       let streamItem = null;
       let streamAttempt = null;   // write_node 재작성(attempt 증가) 시 새 말풍선으로 끊는다
@@ -200,6 +236,15 @@ createApp({
             streamAttempt = e.attempt;
           }
           streamItem.text += e.delta;
+          scrollToBottom();
+          return;
+        }
+
+        if (e.type === 'ApprovalRequired') {   // [개선 11] 그래프가 멈췄다 → 승인 카드 표시
+          // 토큰으로 흘러나온 초안은 아직 확정 답변이 아니다 — 사용자가 착각하지 않게 표시
+          if (streamItem) streamItem.text = '📝 [승인 전 초안 — 아직 확정 아님]\n' + streamItem.text;
+          log.value.push(reactive({ id: nextId++, kind: 'approval', actions: e.actions, decided: null }));
+          stepsItem.steps.push(`위험 조치 ${e.actions.length}건 발견 → 운영자 승인 대기`);
           scrollToBottom();
           return;
         }
@@ -243,7 +288,7 @@ createApp({
       };
     }
 
-    return { backendLabel, log, input, sending, logEl, onSubmit };
+    return { backendLabel, log, input, sending, logEl, onSubmit, decide };
   },
 }).mount('#app');
 </script>

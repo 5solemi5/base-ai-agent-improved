@@ -11,17 +11,26 @@
 [개선 5] 포트를 BACKEND_PORT 환경변수로(기본 8100 — 다른 프로그램이 8100을 쓰면 바꿔서 기동),
 /chat/stream 도중 예외가 나면 연결을 끊지 않고 Error 이벤트 + [DONE]을 보내며, 응답 metadata에
 개선 지표(조사 대상 출처·미등록 시스템·runbook 선택 방식·근거 문제)를 함께 돌려준다.
+
+[개선 11] Human-in-the-loop: 답변에 위험 조치가 있으면 그래프가 approval 노드에서 멈춘다(interrupt).
+  - /chat         → {"status": "pending_approval", "approval": {...}} 로 응답하고 결정을 기다린다
+  - /chat/stream  → ApprovalRequired 이벤트를 보내고 스트림을 닫는다
+  - POST /chat/approve, GET /chat/approve/stream 으로 승인/거절을 넘기면 멈춘 지점부터 이어서 실행한다
+요청마다 체크포인트 키(run_key = thread_id:난수)를 새로 만든다 — 같은 키를 재사용하면 이전 요청의
+상태(collected, draft …)가 다음 요청에 섞인다. 대화 이력은 지금처럼 session.db가 맡는다.
 """
 import json
 import os
+import uuid
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 
 load_dotenv()   # LANGCHAIN_TRACING_V2 / API_KEY / PROJECT — import보다 먼저
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
+from langgraph.types import Command
 from langsmith import traceable
 from langsmith.run_helpers import get_current_run_tree
 from pydantic import BaseModel
@@ -39,6 +48,12 @@ CREATION_COUNT = 0   # Wave 1 — 프로세스 내 Agent 번들 생성 횟수 (�
 class ChatRequest(BaseModel):   # Wave 1 — Pydantic 요청 검증
     message: str
     thread_id: str = "default"
+
+
+class ApproveRequest(BaseModel):   # [개선 11]
+    thread_id: str = "default"
+    approved: bool
+    comment: str = ""
 
 
 def _build_llms():
@@ -77,10 +92,12 @@ async def lifespan(app: FastAPI):
         mcp=mcp,
         session_store=SqliteSessionStore(),
         version=os.environ.get("SUPERVISOR_VERSION", "v2"),
+        hitl=os.environ.get("HITL_APPROVAL", "1") == "1",   # [개선 11] 기본 켬, 자동 평가 땐 0
     )
     app.state.deps = deps
     app.state.graph = build_graph(deps) if deps.version == "v2" else None
     app.state.instance_id = id(deps)
+    app.state.pending = {}   # [개선 11] thread_id → {"run_key", "message"} : 승인 대기 중인 요청
     yield
     await mcp.stop()
     deps.session_store.close()
@@ -100,6 +117,7 @@ async def health():
             "creation_count": CREATION_COUNT,
             "supervisor_version": app.state.deps.version,
             "llm_backend": app.state.llm_backend,
+            "hitl": app.state.deps.hitl,
             "fast_llm": app.state.deps.fast_llm.name,
             "quality_llm": app.state.deps.quality_llm.name}
 
@@ -123,6 +141,7 @@ def _metadata(result: dict, run_id: str | None) -> dict:
         "runbook_method": next((e.get("method") for e in result.get("events", [])
                                 if e.get("type") == "RunbookSelected"), None),
         "agents_called": result.get("agents_called", []),   # [개선 10]
+        "approval": result.get("approval"),                  # [개선 11]
         "cost_usd": result.get("cost_usd", 0.0),
         "llm_backend": app.state.llm_backend,
         "supervisor_version": app.state.deps.version,
@@ -131,14 +150,30 @@ def _metadata(result: dict, run_id: str | None) -> dict:
     }
 
 
+def _run_config(run_key: str) -> dict:
+    return {"configurable": {"thread_id": run_key}}
+
+
+def _interrupt_payload(result: dict) -> dict | None:
+    """ainvoke 결과에 __interrupt__가 있으면 = approval 노드에서 멈췄다."""
+    intr = result.get("__interrupt__")
+    return intr[0].value if intr else None
+
+
 @traceable(name="chat_request")
 async def _handle_chat(message: str, thread_id: str) -> tuple[dict, str | None]:
     deps = app.state.deps
     history = deps.session_store.load(thread_id)   # Wave 12
+    app.state.pending.pop(thread_id, None)   # 승인 대기 중에 새 질문이 오면 이전 대기는 버린다
     if deps.version == "v2":
+        run_key = f"{thread_id}:{uuid.uuid4().hex[:8]}"
         result = await app.state.graph.ainvoke(
             {"query": message, "thread_id": thread_id, "history": history,
-             "events": [], "cost_usd": 0.0})
+             "events": [], "cost_usd": 0.0}, config=_run_config(run_key))
+        if _interrupt_payload(result):   # [개선 11] 승인 대기 — 대화 이력은 결정이 난 뒤에 저장
+            app.state.pending[thread_id] = {"run_key": run_key, "message": message}
+            rt = get_current_run_tree()
+            return result, (str(rt.id) if rt else None)
     else:
         result = await run_v1(deps, message, thread_id, history)   # Wave 14
     deps.session_store.append(thread_id, "user", message)
@@ -147,11 +182,89 @@ async def _handle_chat(message: str, thread_id: str) -> tuple[dict, str | None]:
     return result, (str(rt.id) if rt else None)
 
 
+def _chat_response(result: dict, run_id: str | None) -> dict:
+    payload = _interrupt_payload(result)
+    if payload:
+        return {"status": "pending_approval", "approval": payload,
+                "reply": "⏸ 위험 조치가 포함된 답변입니다. 운영자 승인을 기다리는 중입니다.",
+                "events": result.get("events", []), "metadata": _metadata(result, run_id)}
+    return {"status": "done", "reply": result["final"], "events": result.get("events", []),
+            "metadata": _metadata(result, run_id)}
+
+
 @app.post("/chat")
 async def chat(req: ChatRequest):
     result, run_id = await _handle_chat(req.message, req.thread_id)
-    return {"reply": result["final"], "events": result.get("events", []),
-            "metadata": _metadata(result, run_id)}
+    return _chat_response(result, run_id)
+
+
+def _take_pending(thread_id: str) -> dict:
+    pending = app.state.pending.pop(thread_id, None)
+    if pending is None:
+        raise HTTPException(404, f"승인 대기 중인 요청이 없습니다: thread_id={thread_id}")
+    return pending
+
+
+@app.post("/chat/approve")
+async def approve(req: ApproveRequest):
+    """[개선 11] 멈춘 그래프를 사람의 결정으로 재개한다."""
+    pending = _take_pending(req.thread_id)
+    result = await app.state.graph.ainvoke(
+        Command(resume={"approved": req.approved, "comment": req.comment}),
+        config=_run_config(pending["run_key"]))
+    deps = app.state.deps
+    deps.session_store.append(req.thread_id, "user", pending["message"])
+    deps.session_store.append(req.thread_id, "assistant", result["final"])
+    return _chat_response(result, None)
+
+
+def _sse(obj) -> str:
+    return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n"
+
+
+def _guarded(body):
+    """[개선 5] 예외가 나도 연결을 그냥 끊지 않고 Error 이벤트 + [DONE]으로 끝낸다."""
+    async def gen():
+        try:
+            async for chunk in body:
+                yield chunk
+        except Exception as e:   # 원본은 여기서 연결이 그냥 끊겨 화면이 영원히 ⏳ 상태였다
+            yield _sse({"type": "Error", "message": f"{type(e).__name__}: {e}"})
+        yield "data: [DONE]\n\n"
+    return StreamingResponse(gen(), media_type="text/event-stream")
+
+
+async def _stream_graph(graph_input, run_key: str, thread_id: str, message: str, seen: int = 0):
+    """그래프 실행을 SSE로 중계한다. 새 질문과 [개선 11] 승인 후 재개가 같은 코드를 쓴다.
+
+    seen: 이미 화면에 보낸 이벤트 수 — 재개 시 앞부분 이벤트를 다시 보내지 않으려고 넘겨받는다."""
+    deps = app.state.deps
+    final = ""
+    last_prompt = None   # finalize까지 살아남은 최종 write/chat 호출의 실제 프롬프트
+    # stream_mode를 리스트로 주면 (mode, payload) 튜플이 나온다 — "updates"는
+    # 노드가 끝날 때마다의 상태 델타, "custom"은 write_node/chat_answer_node가
+    # get_stream_writer()로 실행 중에 즉시 흘려보내는 토큰(AnswerToken) 이벤트다.
+    async for mode, payload in app.state.graph.astream(
+            graph_input, config=_run_config(run_key), stream_mode=["updates", "custom"]):
+        if mode == "custom":
+            yield _sse(payload)
+            continue
+        if "__interrupt__" in payload:   # [개선 11] approval 노드에서 멈춤 → 결정을 기다린다
+            app.state.pending[thread_id] = {"run_key": run_key, "message": message}
+            yield _sse({**payload["__interrupt__"][0].value, "thread_id": thread_id})
+            return   # FinalAnswer도, 대화 이력 저장도 하지 않는다 — 재개 스트림이 마무리한다
+        for node_name, delta in payload.items():
+            for ev in (delta.get("events") or [])[seen:]:
+                yield _sse({**ev, "node": node_name})
+            if delta.get("events"):
+                seen = len(delta["events"])
+            if delta.get("final"):
+                final = delta["final"]
+            if delta.get("last_prompt"):
+                last_prompt = delta["last_prompt"]
+    yield _sse({"type": "FinalAnswer", "reply": final, "prompt": last_prompt})
+    deps.session_store.append(thread_id, "user", message)
+    deps.session_store.append(thread_id, "assistant", final)
 
 
 @app.get("/chat/stream")
@@ -163,52 +276,39 @@ async def chat_stream(message: str, thread_id: str = "default"):
     """
     deps = app.state.deps
 
-    async def gen():
-        try:
-            async for chunk in _stream_body():
-                yield chunk
-        except Exception as e:   # [개선 5] 원본은 여기서 연결이 그냥 끊겨 화면이 영원히 ⏳ 상태였다
-            err = {"type": "Error", "message": f"{type(e).__name__}: {e}"}
-            yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
-        yield "data: [DONE]\n\n"
-
-    async def _stream_body():
+    async def body():
         history = deps.session_store.load(thread_id)
+        app.state.pending.pop(thread_id, None)
         if deps.version != "v2":
             result = await run_v1(deps, message, thread_id, history)
             for ev in result["events"]:
-                yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
-            yield f"data: {json.dumps({'type': 'FinalAnswer', 'reply': result['final']}, ensure_ascii=False)}\n\n"
+                yield _sse(ev)
+            yield _sse({"type": "FinalAnswer", "reply": result["final"]})
             deps.session_store.append(thread_id, "user", message)   # 원본 v1 스트림은 저장을 빠뜨렸다
             deps.session_store.append(thread_id, "assistant", result["final"])
-        else:
-            seen = 0
-            final = ""
-            last_prompt = None   # finalize까지 살아남은 최종 write/chat 호출의 실제 프롬프트
-            # stream_mode를 리스트로 주면 (mode, payload) 튜플이 나온다 — "updates"는
-            # 노드가 끝날 때마다의 상태 델타, "custom"은 write_node/chat_answer_node가
-            # get_stream_writer()로 실행 중에 즉시 흘려보내는 토큰(AnswerToken) 이벤트다.
-            async for mode, payload in app.state.graph.astream(
-                    {"query": message, "thread_id": thread_id, "history": history,
-                     "events": [], "cost_usd": 0.0}, stream_mode=["updates", "custom"]):
-                if mode == "custom":
-                    yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
-                    continue
-                for node_name, delta in payload.items():
-                    for ev in (delta.get("events") or [])[seen:]:
-                        ev = {**ev, "node": node_name}
-                        yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
-                    if delta.get("events"):
-                        seen = len(delta["events"])
-                    if delta.get("final"):
-                        final = delta["final"]
-                    if delta.get("last_prompt"):
-                        last_prompt = delta["last_prompt"]
-            yield f"data: {json.dumps({'type': 'FinalAnswer', 'reply': final, 'prompt': last_prompt}, ensure_ascii=False)}\n\n"
-            deps.session_store.append(thread_id, "user", message)
-            deps.session_store.append(thread_id, "assistant", final)
+            return
+        graph_input = {"query": message, "thread_id": thread_id, "history": history,
+                       "events": [], "cost_usd": 0.0}
+        async for chunk in _stream_graph(graph_input, f"{thread_id}:{uuid.uuid4().hex[:8]}",
+                                         thread_id, message):
+            yield chunk
 
-    return StreamingResponse(gen(), media_type="text/event-stream")
+    return _guarded(body())
+
+
+@app.get("/chat/approve/stream")
+async def approve_stream(thread_id: str, approved: bool, comment: str = ""):
+    """[개선 11] 승인/거절을 넘기고, 멈췄던 지점(approval)부터 finalize까지를 SSE로 이어서 보낸다."""
+    pending = _take_pending(thread_id)
+
+    async def body():
+        snapshot = await app.state.graph.aget_state(_run_config(pending["run_key"]))
+        seen = len(snapshot.values.get("events", []))
+        async for chunk in _stream_graph(Command(resume={"approved": approved, "comment": comment}),
+                                         pending["run_key"], thread_id, pending["message"], seen):
+            yield chunk
+
+    return _guarded(body())
 
 
 if __name__ == "__main__":

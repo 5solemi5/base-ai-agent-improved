@@ -26,6 +26,7 @@ class AgentState(TypedDict, total=False):
     agents_called: list[str]     # [개선 10] 이번 요청에서 research_supervisor가 부른 서브에이전트
     next_agent: str              # [개선 10] research_supervisor가 고른 다음 서브에이전트
     degraded: list[str]          # [개선 10] metrics_agent가 판정한 저하 시스템
+    approval: dict               # [개선 11] 사람 승인 결과 {approved, actions}
     grounding_issues: list[str]  # [개선 4] 마지막 검증에서 남은 근거 문제(최대 시도 후 통과 시 안내)
 
 

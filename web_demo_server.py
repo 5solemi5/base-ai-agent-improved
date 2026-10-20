@@ -64,6 +64,29 @@ async def proxy_stream(message: str, thread_id: str = "web-demo"):
     return StreamingResponse(relay(), media_type="text/event-stream")
 
 
+@app.post("/chat/approve")
+async def proxy_approve(req: Request):   # [개선 11] 승인/거절 (JSON)
+    body = await req.body()
+    async with httpx.AsyncClient(timeout=600.0) as client:
+        r = await client.post(f"{BACKEND}/chat/approve", content=body,
+                              headers={"content-type": "application/json"})
+    return JSONResponse(r.json(), status_code=r.status_code)
+
+
+@app.get("/chat/approve/stream")
+async def proxy_approve_stream(thread_id: str, approved: bool, comment: str = ""):   # [개선 11]
+    async def relay():
+        async with httpx.AsyncClient(timeout=None) as client:
+            async with client.stream(
+                "GET", f"{BACKEND}/chat/approve/stream",
+                params={"thread_id": thread_id, "approved": str(approved).lower(), "comment": comment},
+            ) as upstream:
+                async for chunk in upstream.aiter_bytes():
+                    yield chunk
+
+    return StreamingResponse(relay(), media_type="text/event-stream")
+
+
 if __name__ == "__main__":
     print(f"브라우저에서 http://localhost:{FRONT_PORT} 을 열어보세요 (백엔드: {BACKEND})")
     # 0.0.0.0이면 같은 네트워크의 다른 기기에서도 접속된다 — 데모 PC 밖으로 열 이유가 없어 127.0.0.1로

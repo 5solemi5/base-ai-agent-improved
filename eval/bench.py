@@ -12,6 +12,7 @@
 - unknown_ok      : 모니터링 대상이 아닌 시스템을 다른 시스템으로 바꿔치기하지 않았는가
 - flags           : 답변에 조사하지 않은 시스템/수집하지 않은 로그 분석 결과가 등장했는가
 - cost_usd, retry_count, validation_attempts : 서버가 metadata로 돌려준 값
+- approval        : [개선 11] 위험 조치 승인을 요청받았는가 — 측정에서는 자동 승인(--reject면 자동 거절)
 """
 import argparse
 import json
@@ -56,6 +57,7 @@ def score(case: dict, res: dict) -> dict:
            "cost_usd": meta.get("cost_usd", 0.0), "retry_count": meta.get("retry_count", 0),
            "validation_attempts": meta.get("validation_attempts", 0),
            "probed": probed, "runbooks": rbs, "reply": reply,
+           "approval": res.get("approval_requested", False),
            "events": events, "metadata": meta}   # 원자료도 저장 → --rescore로 재채점 가능
     if case["route"] == "incident":
         exp = set(case["systems"])
@@ -100,6 +102,7 @@ def summarize(rows: list[dict]) -> dict:
         "cost_usd": round(sum(r["cost_usd"] for r in rows), 6),
         "retry_total": sum(r["retry_count"] for r in rows),
         "validation_attempts_total": sum(r["validation_attempts"] for r in rows),
+        "approvals_requested": sum(bool(r.get("approval")) for r in rows),
     }
 
 
@@ -108,6 +111,7 @@ def main():
     ap.add_argument("--url", default="http://127.0.0.1:8100")
     ap.add_argument("--label", required=True)
     ap.add_argument("--timeout", type=float, default=600)
+    ap.add_argument("--reject", action="store_true", help="승인 요청을 자동 거절(기본: 자동 승인)")
     ap.add_argument("--rescore", action="store_true",
                     help="서버에 다시 묻지 않고 저장된 결과를 현재 채점 규칙으로 다시 계산")
     args = ap.parse_args()
@@ -133,6 +137,13 @@ def main():
         try:
             res = httpx.post(f"{args.url}/chat", json={"message": case["query"], "thread_id": thread},
                              timeout=args.timeout).json()
+            if res.get("status") == "pending_approval":   # [개선 11] 사람 대신 자동으로 결정
+                events_before = res.get("events", [])
+                res = httpx.post(f"{args.url}/chat/approve",
+                                 json={"thread_id": thread, "approved": not args.reject,
+                                       "comment": "bench 자동 결정"}, timeout=args.timeout).json()
+                res["events"] = res.get("events") or events_before
+                res["approval_requested"] = True
         except Exception as e:   # 실패도 결과로 남긴다
             res = {"reply": f"[ERROR] {e!r}", "events": [], "metadata": {}}
         res["elapsed_s"] = round(time.perf_counter() - t0, 1)

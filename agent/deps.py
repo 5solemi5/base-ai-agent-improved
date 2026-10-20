@@ -15,3 +15,4 @@ class SupervisorDeps:
     mcp: Any             # Wave 2  — MCP stdio 클라이언트 (Tool/Resource/Prompt)
     session_store: Any   # Wave 12 — SQLite 세션 저장소
     version: str         # Wave 14 — SUPERVISOR_VERSION (v1/v2)
+    hitl: bool = False   # [개선 11] 위험 조치 사람 승인 사용 여부 (HITL_APPROVAL 환경변수)

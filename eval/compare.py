@@ -29,7 +29,7 @@ def main():
     print(f"| 지표 | {a['label']} | {b['label']} |")
     print("|---|---|---|")
     for key, name in LABELS:
-        print(f"| {name} | {a['summary'][key]} | {b['summary'][key]} |")
+        print(f"| {name} | {a['summary'].get(key, '-')} | {b['summary'].get(key, '-')} |")
     print()
     print(f"| # | 쿼리 | {a['label']} 조사·runbook·시간 | {b['label']} 조사·runbook·시간 |")
     print("|---|---|---|---|")

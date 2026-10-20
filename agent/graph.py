@@ -3,7 +3,8 @@
 route → (chat 직행 | incident 파이프라인)
 incident: plan(MCP Prompt 절차 반영) → gate(권위 게이트)
           → research_supervisor ⇄ {metrics_agent, log_agent, runbook_agent}  ([개선 10] 서브에이전트)
-          → analysis(needs_analysis=True일 때만 실제 실행) → write → validate(반려 시 재작성) → finalize
+          → analysis(needs_analysis=True일 때만 실제 실행) → write → validate(반려 시 재작성)
+          → approval([개선 11] 위험 조치면 사람 승인) → finalize
 
 모든 노드는 SupervisorDeps를 functools.partial로 주입받는 순수 함수다(Wave 13).
 각 노드는 @traceable로 LangSmith에 계층 트리로 기록된다.
@@ -18,6 +19,8 @@ incident: plan(MCP Prompt 절차 반영) → gate(권위 게이트)
   9 되묻기 : 시스템을 특정할 수 없으면 기본 시스템(auth-service)으로 찍지 않고 clarify 노드에서 되묻는다
   10 멀티에이전트 : research + replan_check를 메트릭·로그·런북 전문 서브에이전트(compiled subgraph) 3개와
              이들을 지휘하는 research_supervisor로 교체 (agent/research/)
+  11 HITL  : 검수를 통과한 답변에 재시작·롤백 같은 위험 조치가 있으면 approval 노드에서 interrupt()로
+             멈추고 사람의 승인/거절을 받은 뒤 finalize (agent/nodes/approval.py)
 """
 from functools import partial
 
@@ -25,6 +28,7 @@ from langgraph.graph import END, StateGraph
 
 from .deps import SupervisorDeps
 from .nodes.analysis import analysis_node
+from .nodes.approval import approval_node
 from .nodes.planning import clarify_node, gate_node, plan_node, unknown_system_node
 from .nodes.routing import chat_answer_node, route_gate, route_node
 from .nodes.state import AgentState
@@ -58,10 +62,15 @@ def _after_supervisor(state: AgentState) -> str:
 
 
 def _after_validate(state: AgentState) -> str:
-    return "finalize" if state.get("validation_feedback") is None else "write"
+    # [개선 11] 합격한 답변은 finalize 전에 approval(위험 조치 사람 승인)을 거친다
+    return "approval" if state.get("validation_feedback") is None else "write"
 
 
-def build_graph(deps: SupervisorDeps):
+def build_graph(deps: SupervisorDeps, checkpointer=None):
+    """checkpointer: [개선 11] interrupt()로 멈춘 상태를 저장할 곳. HITL을 켰는데 안 주면 메모리 저장소를 쓴다."""
+    if deps.hitl and checkpointer is None:
+        from langgraph.checkpoint.memory import InMemorySaver
+        checkpointer = InMemorySaver()
     g = StateGraph(AgentState)
     node = lambda fn: partial(fn, deps=deps)   # Wave 13 — 명시적 의존성 주입
     g.add_node("route", node(route_node))
@@ -78,6 +87,7 @@ def build_graph(deps: SupervisorDeps):
     g.add_node("analysis", node(analysis_node))
     g.add_node("write", node(write_node))
     g.add_node("validate", node(validate_node))
+    g.add_node("approval", node(approval_node))
     g.add_node("finalize", node(finalize_node))
 
     g.set_entry_point("route")
@@ -97,6 +107,7 @@ def build_graph(deps: SupervisorDeps):
     g.add_edge("analysis", "write")
     g.add_edge("write", "validate")
     g.add_conditional_edges("validate", _after_validate,
-                            {"finalize": "finalize", "write": "write"})
+                            {"approval": "approval", "write": "write"})
+    g.add_edge("approval", "finalize")
     g.add_edge("finalize", END)
-    return g.compile()
+    return g.compile(checkpointer=checkpointer)
