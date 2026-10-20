@@ -11,7 +11,6 @@ class AgentState(TypedDict, total=False):
     tasks: list[dict]
     gate_removed: int
     collected: list[dict]
-    replan_rounds: int
     retry_count: int
     parallel_elapsed: float
     draft: str

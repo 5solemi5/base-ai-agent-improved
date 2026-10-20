@@ -21,6 +21,8 @@ AGENTS = ("metrics_agent", "log_agent", "runbook_agent")
 def next_agent(state: AgentState) -> str:
     """지금까지 수집된 것을 보고 다음 서브에이전트(또는 'done')를 고른다. 순수 함수 — 단위 테스트 대상."""
     called = state.get("agents_called", [])
+    if len(called) >= len(AGENTS):   # [리뷰 반영] 하드 상한 — 어떤 경우에도 서브에이전트 호출은 3번을 넘지 않는다
+        return "done"
     if "metrics_agent" not in called:
         return "metrics_agent"
     degraded = state.get("degraded", [])

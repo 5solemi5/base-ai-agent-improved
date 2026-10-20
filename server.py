@@ -136,7 +136,6 @@ def _metadata(result: dict, run_id: str | None) -> dict:
         "route": result.get("route"),
         "task_count": len(result.get("tasks", [])),
         "gate_removed": result.get("gate_removed", 0),
-        "replan_rounds": result.get("replan_rounds", 0),
         "retry_count": result.get("retry_count", 0),
         "parallel_elapsed": result.get("parallel_elapsed"),
         "validation_attempts": result.get("validation_attempts", 0),

@@ -3,7 +3,7 @@
     state.py    : 그래프 상태(AgentState)와 노드들이 같이 쓰는 작은 도우미
     routing.py  : route(잡담/장애 분류) · chat_answer(잡담 답변)
     planning.py : plan(조사 계획) · unknown_system(미등록 시스템 안내) · gate(권위 게이트)
-    research.py : research(MCP 조회) · replan_check(runbook RAG 선택)
+    (research·replan_check는 [개선 10]에서 agent/research/ 서브에이전트 패키지로 옮겼다)
     analysis.py : analysis(여러 시스템 비교)
     writing.py  : write(답변 작성) · validate(형식·근거 검사) · finalize(마무리)
 

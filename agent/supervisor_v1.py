@@ -29,6 +29,6 @@ async def run_v1(deps: SupervisorDeps, query: str, thread_id: str,
     events.append({"type": "Finalize", "pipeline": "legacy-v1"})
     return {"final": reply, "route": "legacy", "events": events,
             "cost_usd": usage["usd"], "validation_attempts": 0,
-            "replan_rounds": 0, "gate_removed": 0,
+            "gate_removed": 0,
             "retry_count": next((e.get("retries", 0) for e in events
                                  if e["type"] == "TaskCompleted"), 0)}

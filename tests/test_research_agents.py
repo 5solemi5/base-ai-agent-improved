@@ -46,3 +46,8 @@ def test_log_claims_allowed_once_logs_collected():
     from agent.grounding import check_grounding
     collected = [{"source": "log", "data": {"system_name": "auth-service", "top": []}}]
     assert not any("로그" in i for i in check_grounding("로그 확인 결과 풀 고갈 반복", collected))
+
+
+def test_supervisor_hard_cap():
+    # [리뷰 반영] 이름이 겹치거나 상태가 이상해도 3번 부른 뒤에는 무조건 끝낸다
+    assert next_agent({"agents_called": ["metrics_agent"] * 3, "degraded": ["x"]}) == "done"
