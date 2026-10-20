@@ -92,7 +92,10 @@ class RunbookRetriever:
         self.chunks: list[dict] = []   # {"incident_type": ..., "text": ...}  ← 메타데이터 + 본문
         for path in sorted(RUNBOOK_DIR.glob("*.md")):
             itype = path.stem
-            lines = [l.strip("#-0123456789. ").strip() for l in path.read_text(encoding="utf-8").splitlines()]
+            # [8단계 수정] 줄 '앞'의 제목 기호·번호만 뗀다. str.strip("#-0123456789. ")는 양 끝에서
+            # 숫자를 모두 벗겨 "4. 5분 내 …"가 "분 내 …"가 되던 버그가 있었다.
+            lines = [re.sub(r"^\s*(?:#+|\d+\.)\s*", "", l).strip()
+                     for l in path.read_text(encoding="utf-8").splitlines()]
             for line in filter(None, lines):
                 self.chunks.append({"incident_type": itype, "text": line})
             for phrase in meta.get(itype, []):

@@ -103,7 +103,7 @@ cat <<EOF
 
 3) 브라우저 채팅 화면으로 써보기 (새 터미널에서)
    python3 web_demo_server.py
-   → http://localhost:8600 접속
+   → http://localhost:${FRONT_PORT:-8600} 접속  (포트를 바꿨다면: BACKEND_PORT=${BACKEND_PORT} bash sh/run_frontend.sh)
 
 더 자세한 사용 예는 manual_ollma.md 참고. 종료하려면 이 터미널에서 Ctrl+C.
 EOF

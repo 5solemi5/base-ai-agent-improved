@@ -14,7 +14,8 @@ fast=`qwen3:0.6b`, quality=`qwen3:8b`, 각 조건 1회 측정(LLM이라 실행�
 | 3 | RAG | incident_type 키워드 규칙: healthy 시스템이면 db-down 폴백, 질문 무시 | runbook 조각 + incident_type 메타데이터 벡터 인덱스(TF-IDF, 임베딩 선택) | `agent/runbook_retriever.py`, `data/runbook_meta.json` |
 | 4 | 검증 | validator가 "30자 + 1)"만 확인 → 지어낸 로그 분석, 조사 안 한 시스템 단정이 통과 | 근거 검사(조사 안 한 시스템·없는 수치·로그 단정) 후 재작성 요청, 남으면 경고 첨부 | `agent/grounding.py`, `graph.py` `validate_node` |
 | 5 | 운영 | 실행 스크립트가 8100 포트 주인을 무조건 `kill -9`(Docker 백엔드), 기동마다 session.db 삭제, 포트 하드코딩, 화면 검수 표시 버그, 새로고침 시 대화 잊음 | 이 폴더의 서버일 때만 종료, 세션 보존, `BACKEND_PORT`/`FRONT_PORT`, 화면 버그 수정 | `sh/*.sh`, `server.py`, `web_demo_server.py`, `web_chat.html` |
-| 6 | 테스트 | 테스트 없음 | pytest 45개(LLM·MCP 없이 실행) | `tests/` |
+| 6 | 테스트 | 테스트 없음 | pytest 48개(LLM·MCP 없이 실행) | `tests/` |
+| 7 | 리뷰 | 코드 리뷰에서 버그 발견: runbook 조각의 숫자 손실("5분"→"분"), 조회 시각 숫자가 '사실'로 섞여 지어낸 수치 통과, embed 검색의 동기 호출, 오류 시에도 ✓ 표시 | 각 1줄 수정 + 회귀 테스트(수정 전 코드에서 실패 확인) | `runbook_retriever.py`, `grounding.py`, `graph.py`, `web_chat.html` |
 
 ## 2. Before / After (같은 9개 질문, `eval/bench.py`)
 
@@ -28,6 +29,8 @@ fast=`qwen3:0.6b`, quality=`qwen3:8b`, 각 조건 1회 측정(LLM이라 실행�
 | 미등록 시스템 정직하게 안내 | 0/1 | 1/1 |
 | 근거 없는 내용이 섞인 답변 | 3 | 0 |
 | 가상 비용 합계(USD) | 0.035891 | 0.016716 (53% ↓) |
+
+7번 수정 후 최종 코드로 다시 잰 결과(`eval/results/after_ollama_final.json`): 장애 6개 49.8초, 누락 0, 과잉 0, runbook 6/6, 미등록 1/1, 근거 없는 답 0, 비용 0.016451 — 위 After와 같은 수준(1회 측정).
 
 | 추가 측정 | Before | After |
 |---|---|---|
@@ -47,7 +50,7 @@ fast=`qwen3:0.6b`, quality=`qwen3:8b`, 각 조건 1회 측정(LLM이라 실행�
 
 ```bash
 bash sh/setup_venv.sh && .venv/bin/python3 -m pip install -r requirements-dev.txt
-.venv/bin/python3 -m pytest -q                       # 45 passed
+.venv/bin/python3 -m pytest -q                       # 48 passed
 .venv/bin/python3 eval/rag_eval.py                    # RAG 정확도
 BACKEND_PORT=8101 bash sh/run_agent_ollma.sh          # 다른 터미널
 .venv/bin/python3 eval/bench.py --url http://127.0.0.1:8101 --label after

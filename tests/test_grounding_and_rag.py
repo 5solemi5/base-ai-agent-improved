@@ -82,3 +82,19 @@ def test_embed_falls_back_to_tfidf_when_model_missing(monkeypatch):
     monkeypatch.setenv("OLLAMA_EMBED_URL", "http://127.0.0.1:9/api/embed")
     r = RunbookRetriever(method="embed")
     assert r.method == "tfidf" and hasattr(r, "fallback_reason")
+
+
+# ---------- 8단계: 코드 리뷰에서 찾은 버그의 회귀 테스트 ----------
+
+def test_runbook_chunk_keeps_numbers_inside_text(retriever):
+    # "4. 5분 내 p95가 …" → 앞 번호 "4."만 떼고 본문의 "5분"은 남아야 한다
+    texts = [c["text"] for c in retriever.chunks if c["incident_type"] == "high-latency"]
+    assert any(t.startswith("5분 내") for t in texts)
+    assert not any(t.startswith("분 내") for t in texts)
+
+
+def test_last_checked_time_is_not_a_fact():
+    # 조회 시각 10:41의 "41"이 사실로 들어가 지어낸 "41%"가 통과하던 버그
+    mon = {"source": "monitoring", "data": {**AUTH["data"], "last_checked": "2026-10-20T10:41:07.123456"}}
+    issues = check_grounding("1) auth-service CPU 41% 2) 커넥션 풀 92%", [mon])
+    assert any("41%" in i for i in issues)

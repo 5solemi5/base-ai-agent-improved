@@ -229,7 +229,8 @@ async def replan_check_node(state: AgentState, deps: SupervisorDeps) -> dict:
         verdict = {"type": "ReplanCheck", "round": rounds, "is_sufficient": True}
         return {"events": state["events"] + [verdict]}
     # [개선 3] 키워드 규칙 대신 runbook 벡터 검색 — 사용자 질문 + 저하된 시스템의 알림이 질의
-    picked = RETRIEVER.classify(state["query"], state.get("collected", []))
+    # [8단계 수정] embed 모드면 classify 안에서 동기 HTTP 호출 → 스레드로 넘겨 이벤트 루프를 막지 않는다
+    picked = await asyncio.to_thread(RETRIEVER.classify, state["query"], state.get("collected", []))
     incident_type = picked["incident_type"]
     gap_task = {"id": "task-gap-runbook", "agent": "research", "kind": "runbook",
                 "target": incident_type, "status": "pending"}

@@ -29,7 +29,9 @@ def _fact_numbers(collected: list[dict]) -> set[str]:
     for c in collected:
         data = c.get("data")
         if isinstance(data, dict):
-            text_parts += [str(v) for v in data.values()]
+            # [8단계 수정] 조회 시각(last_checked)은 사실 수치가 아니다 — 원래는 "10:41"의 41이 사실로
+            # 들어가 지어낸 "41%"가 통과할 수 있었다.
+            text_parts += [str(v) for k, v in data.items() if k != "last_checked"]
         else:
             text_parts.append(str(data))
     nums = set()

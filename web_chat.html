@@ -164,7 +164,7 @@ createApp({
       sending.value = true;
       scrollToBottom();
 
-      const stepsItem = reactive({ id: nextId++, kind: 'steps', steps: [], done: false });
+      const stepsItem = reactive({ id: nextId++, kind: 'steps', steps: [], done: false, failed: false });
       log.value.push(stepsItem);
       scrollToBottom();
 
@@ -176,7 +176,7 @@ createApp({
       es.onmessage = (event) => {
         if (event.data === '[DONE]') {
           es.close(); sending.value = false;
-          stepsItem.done = true;   // [개선 5] 끝난 단계를 ✓로 바꾼다(원본 CSS에 .done이 있었지만 쓰이지 않았다)
+          stepsItem.done = !stepsItem.failed;   // [개선 5] 끝난 단계를 ✓로 바꾼다(원본 CSS에 .done이 있었지만 쓰이지 않았다)
           return;
         }
         let e;
@@ -195,6 +195,8 @@ createApp({
 
         if (e.type === 'Error') {   // [개선 5] 서버 오류를 화면에 보여준다(원본은 아무 표시 없이 멈춤)
           log.value.push({ id: nextId++, kind: 'agent', text: '⚠️ 처리 중 오류: ' + e.message });
+          stepsItem.failed = true;   // [8단계 수정] 오류로 끝난 단계는 ✓로 바꾸지 않는다
+          stepsItem.steps.push('오류로 중단됨');
           scrollToBottom();
           return;
         }

@@ -79,3 +79,8 @@ def test_as_bool(value, expected):
 ])
 def test_incident_pattern(query, incident):
     assert bool(INCIDENT_PATTERN.search(query)) is incident
+
+
+def test_incident_pattern_covers_conjugations():
+    # 7단계 실험: 패턴에서 "느려"를 빼도 기존 테스트가 모두 통과했다 → 빈틈을 메우는 문장
+    assert INCIDENT_PATTERN.search("결제가 느려졌어")
