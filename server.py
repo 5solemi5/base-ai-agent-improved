@@ -6,7 +6,7 @@
 - Wave 3  : GET /chat/stream — 그래프 실행 과정을 SSE 이벤트로 스트리밍
 - Wave 12 : 대화 이력을 SQLite(session.db)에 저장 — 재시작해도 유지
 - Wave 14 : SUPERVISOR_VERSION(v1/v2) 환경변수로 legacy/신형 파이프라인 즉시 전환
-- LangSmith: 요청당 chat_request 루트 run 아래로 노드·LLM·MCP 호출이 계층 기록됨
+- LangSmith: (LANGCHAIN_TRACING_V2=true와 유효한 키가 있을 때) 요청당 chat_request 루트 run 아래로 노드·LLM·MCP 호출이 계층 기록됨
 
 [개선 5] 포트를 BACKEND_PORT 환경변수로(기본 8100 — 다른 프로그램이 8100을 쓰면 바꿔서 기동),
 /chat/stream 도중 예외가 나면 연결을 끊지 않고 Error 이벤트 + [DONE]을 보내며, 응답 metadata에

@@ -1,4 +1,5 @@
-"""[개선 10] Research 멀티 에이전트 — 단일 research_node를 전문 서브에이전트 3개로 나눴다.
+"""[개선 10] Research 멀티 에이전트 '구조' — 단일 research_node를 서브그래프(compiled subgraph) 3개로 나눴다.
+서브그래프 안에는 LLM 호출이 없다(도구 조회 + 상태 판정·개수 세기·TF-IDF 검색). 부를 순서도 코드가 정한다.
 
     metrics_agent.py : 메트릭 분석 — 모니터링 지표 조회(병렬·재시도) → 저하 시스템 판정
     log_agent.py     : 로그 분석   — 저하된 시스템의 WARN/ERROR 로그 조회 → 오류 패턴 요약

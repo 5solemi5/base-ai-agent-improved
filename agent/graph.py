@@ -7,7 +7,8 @@ incident: plan(MCP Prompt 절차 반영) → gate(권위 게이트)
           → approval([개선 11] 위험 조치면 사람 승인) → finalize
 
 모든 노드는 SupervisorDeps를 functools.partial로 주입받는 순수 함수다(Wave 13).
-각 노드는 @traceable로 LangSmith에 계층 트리로 기록된다.
+각 노드에는 @traceable이 붙어 있어, LANGCHAIN_TRACING_V2=true와 유효한 LangSmith 키가 있을 때 계층 트리로
+기록된다(개선 1~14 동안은 추적이 꺼져 있었고, 개선 15에서 처음 켰다).
 
 [개선 요약 — Mini-Project 과제 1번]
   1 성능   : route/plan/analyze의 동기 LLM 호출을 asyncio.to_thread로 — 이벤트 루프 블로킹 해소
@@ -17,8 +18,8 @@ incident: plan(MCP Prompt 절차 반영) → gate(권위 게이트)
   4 검증   : validate가 형식 + 근거(agent/grounding.py)를 함께 검사, 최대 시도 후 통과 시 경고 문구 첨부
   8 모듈화 : 노드 구현은 agent/nodes/ 패키지로 옮기고, 이 파일에는 '노드 연결(엣지)'만 남겼다
   9 되묻기 : 시스템을 특정할 수 없으면 기본 시스템(auth-service)으로 찍지 않고 clarify 노드에서 되묻는다
-  10 멀티에이전트 : research + replan_check를 메트릭·로그·런북 전문 서브에이전트(compiled subgraph) 3개와
-             이들을 지휘하는 research_supervisor로 교체 (agent/research/)
+  10 멀티에이전트 구조 : research + replan_check를 LLM 없이 도구를 조회하는 메트릭·로그·런북 서브그래프
+             (compiled subgraph) 3개와, 부를 순서를 코드가 정하는 research_supervisor 노드로 교체 (agent/research/)
   11 HITL  : 검수를 통과한 답변에 재시작·롤백 같은 위험 조치가 있으면 approval 노드에서 interrupt()로
              멈추고 사람의 승인/거절을 받은 뒤 finalize (agent/nodes/approval.py)
 """

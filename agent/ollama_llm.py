@@ -9,7 +9,8 @@ replan(W7)·validator(W8)가 연출이 아니라 실제 방어선으로 동작�
 추론이라 실제 과금은 0이지만, W10a의 모델 분리 효과를 같은 잣대로 비교하기 위함이다.
 
 [개선 1] qwen3 계열은 Ollama에서 기본으로 thinking(생각 과정 생성)이 켜진다. "안녕"
-한 마디에도 thinking 447자를 만들었고, 장애 쿼리 6건이 356초 걸렸다. 요청마다 "think"
+한 마디에도 thinking 447자를 만들었고, 장애 쿼리 6건이 bench 실측 269.4초 걸렸다(교재 실험에서는
+355.8초). 요청마다 "think"
 값을 명시해(기본 false, OLLAMA_THINK=1이면 true) 끄고 켤 수 있게 했다. 타임아웃도
 환경변수(OLLAMA_TIMEOUT, 기본 120초)로 뺐다.
 [개선 2] 시스템 목록·plan 정규화는 agent/systems.py 한 곳에서 가져온다.
@@ -194,15 +195,24 @@ class OllamaQualityLLM(OllamaLLM):
     @traceable(run_type="llm", name="ollama_quality.write")
     async def write(self, query: str, collected: list[dict], attempt: int,
                     feedback: str | None, on_token=None) -> tuple[str, dict]:
-        system = ("당신은 ICT 운영 보고 작성자다. 수집된 사실만 사용해 한국어로 "
-                  "간결한 대응 보고를 작성하라. 반드시 '1) ... 2) ... 3) ...' 형식의 "
-                  "번호 절차로 답하고, 수치는 수집된 값을 그대로 인용하라. "
-                  "수집된 사실에 없는 시스템·로그·수치는 언급하지 말고, 확인이 필요하면 "
-                  "'추가 확인 필요'라고만 써라.")
         return await self._chat_stream(
-            [{"role": "system", "content": system},
+            [{"role": "system", "content": WRITE_SYSTEM},
              {"role": "user", "content": build_write_prompt(query, collected, feedback)}],
             on_token=on_token)
+
+
+# write 시스템 프롬프트 — openai_llm.py도 같이 쓴다.
+# [개선 15] OpenAI로 다듬기: gpt-4o가 3번 항목 뒤에 문단을 덧붙이거나 "조치가 필요합니다. 추가 확인 필요"처럼
+# 같은 말을 반복해서, 항목 수·길이·마무리 줄 형식을 명시했다. 다듬은 뒤에는 "부하를 분산하겠습니다"처럼
+# 실행하지 않는 조치를 직접 하겠다고 써서, 조치는 권고형으로 쓰게 했다.
+WRITE_SYSTEM = ("당신은 ICT 운영 보고 작성자다. 수집된 사실만 사용해 한국어 존댓말(~습니다)로 "
+                "간결한 대응 보고를 작성하라. 반드시 '1) 현재 상태 2) 로그·원인 근거 3) 대응 조치' "
+                "세 항목으로만 답하고, 항목 이름 뒤에 콜론(:)을 붙여 같은 줄에 2문장 이내로 쓴다. 수치는 수집된 값을 그대로 인용하라. "
+                "당신은 조치를 직접 실행하지 않으므로 3)은 '~을 권장합니다'처럼 권고로 쓰고 '~하겠습니다/진행합니다'라고 쓰지 마라. "
+                "3) 뒤에 다른 문단을 덧붙이지 마라. 사용자가 여러 시스템의 공통 원인을 물으면 3)에서 "
+                "공통 원인이 확인됐는지 먼저 밝혀라. 수집된 사실에 없는 시스템·로그·수치는 언급하지 말고, "
+                "확인이 필요하면 마지막 줄에 '추가 확인 필요: <확인할 것>' 한 줄만 써라. "
+                "마크다운 기호(**, #)는 쓰지 마라.")
 
 
 def format_facts(collected: list[dict]) -> str:

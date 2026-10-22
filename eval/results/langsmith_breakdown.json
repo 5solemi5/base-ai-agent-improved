@@ -1,0 +1,186 @@
+[
+ {
+  "project": "capstone-all-total-ollama",
+  "runs_recorded": 363,
+  "graph_runs": 10,
+  "node_total_s": 48.09,
+  "nodes": [
+   {
+    "node": "write",
+    "seconds": 41.5,
+    "share": 0.863,
+    "calls": 5
+   },
+   {
+    "node": "plan",
+    "seconds": 2.47,
+    "share": 0.051,
+    "calls": 6
+   },
+   {
+    "node": "metrics_agent",
+    "seconds": 2.19,
+    "share": 0.045,
+    "calls": 5
+   },
+   {
+    "node": "route",
+    "seconds": 1.35,
+    "share": 0.028,
+    "calls": 9
+   },
+   {
+    "node": "chat_answer",
+    "seconds": 0.36,
+    "share": 0.007,
+    "calls": 3
+   },
+   {
+    "node": "analysis",
+    "seconds": 0.11,
+    "share": 0.002,
+    "calls": 5
+   },
+   {
+    "node": "runbook_agent",
+    "seconds": 0.03,
+    "share": 0.001,
+    "calls": 5
+   },
+   {
+    "node": "log_agent",
+    "seconds": 0.03,
+    "share": 0.001,
+    "calls": 5
+   },
+   {
+    "node": "research_supervisor",
+    "seconds": 0.02,
+    "share": 0.0,
+    "calls": 20
+   },
+   {
+    "node": "validate",
+    "seconds": 0.02,
+    "share": 0.0,
+    "calls": 5
+   },
+   {
+    "node": "approval",
+    "seconds": 0.01,
+    "share": 0.0,
+    "calls": 6
+   },
+   {
+    "node": "finalize",
+    "seconds": 0.0,
+    "share": 0.0,
+    "calls": 5
+   },
+   {
+    "node": "gate",
+    "seconds": 0.0,
+    "share": 0.0,
+    "calls": 5
+   },
+   {
+    "node": "unknown_system",
+    "seconds": 0.0,
+    "share": 0.0,
+    "calls": 1
+   }
+  ]
+ },
+ {
+  "project": "capstone-all-total-openai",
+  "runs_recorded": 370,
+  "graph_runs": 12,
+  "node_total_s": 30.43,
+  "nodes": [
+   {
+    "node": "write",
+    "seconds": 9.44,
+    "share": 0.31,
+    "calls": 5
+   },
+   {
+    "node": "route",
+    "seconds": 8.17,
+    "share": 0.268,
+    "calls": 9
+   },
+   {
+    "node": "plan",
+    "seconds": 6.25,
+    "share": 0.205,
+    "calls": 6
+   },
+   {
+    "node": "chat_answer",
+    "seconds": 2.32,
+    "share": 0.076,
+    "calls": 3
+   },
+   {
+    "node": "metrics_agent",
+    "seconds": 2.18,
+    "share": 0.071,
+    "calls": 5
+   },
+   {
+    "node": "analysis",
+    "seconds": 1.94,
+    "share": 0.064,
+    "calls": 5
+   },
+   {
+    "node": "runbook_agent",
+    "seconds": 0.04,
+    "share": 0.001,
+    "calls": 5
+   },
+   {
+    "node": "log_agent",
+    "seconds": 0.03,
+    "share": 0.001,
+    "calls": 5
+   },
+   {
+    "node": "research_supervisor",
+    "seconds": 0.02,
+    "share": 0.001,
+    "calls": 20
+   },
+   {
+    "node": "approval",
+    "seconds": 0.01,
+    "share": 0.0,
+    "calls": 8
+   },
+   {
+    "node": "validate",
+    "seconds": 0.01,
+    "share": 0.0,
+    "calls": 5
+   },
+   {
+    "node": "gate",
+    "seconds": 0.01,
+    "share": 0.0,
+    "calls": 5
+   },
+   {
+    "node": "finalize",
+    "seconds": 0.0,
+    "share": 0.0,
+    "calls": 5
+   },
+   {
+    "node": "unknown_system",
+    "seconds": 0.0,
+    "share": 0.0,
+    "calls": 1
+   }
+  ]
+ }
+]

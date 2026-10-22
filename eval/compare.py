@@ -16,7 +16,7 @@ LABELS = [
     ("extra_systems", "불필요하게 조사한 시스템 수"),
     ("runbook_accuracy", "runbook 정확도"),
     ("unknown_handled", "미등록 시스템 정직하게 안내"),
-    ("flagged_answers", "근거 없는 내용이 섞인 답변 수"),
+    ("flagged_answers", "조사 안 한 시스템·로그를 언급한 답변 수"),
     ("name_memory", "이름 기억"),
     ("cost_usd", "가상 비용 합계(USD)"),
     ("retry_total", "재시도 합계"),

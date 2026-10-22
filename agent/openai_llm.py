@@ -31,7 +31,7 @@ import httpx
 from langsmith import traceable
 
 from .memory import SUMMARIZE_SYSTEM, chat_messages, summarize_prompt
-from .ollama_llm import build_write_prompt
+from .ollama_llm import WRITE_SYSTEM, build_write_prompt
 from .systems import INCIDENT_PATTERN, KNOWN_SYSTEMS, as_bool, normalize_plan
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
@@ -173,11 +173,7 @@ class OpenAIQualityLLM(OpenAILLM):
         """ollama_llm.py와 인터페이스(on_token 콜백)만 맞춘다 — OpenAI Chat Completions를
         아직 stream=True로 호출하지 않아 토큰 단위 중계는 하지 않고 완성된 응답을 한 번에
         전달한다."""
-        system = ("당신은 ICT 운영 보고 작성자다. 수집된 사실만 사용해 한국어로 "
-                  "간결한 대응 보고를 작성하라. 반드시 '1) ... 2) ... 3) ...' 형식의 "
-                  "번호 절차로 답하고, 수치는 수집된 값을 그대로 인용하라. "
-                  "수집된 사실에 없는 시스템·로그·수치는 언급하지 말고, 확인이 필요하면 "
-                  "'추가 확인 필요'라고만 써라.")
+        system = WRITE_SYSTEM
         user = build_write_prompt(query, collected, feedback)
         content, usage = await asyncio.to_thread(self._chat, system, user)
         usage["prompt"] = f"[SYSTEM]\n{system}\n\n[USER]\n{user}"
