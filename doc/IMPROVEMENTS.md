@@ -1,6 +1,6 @@
 # Mini-Project 과제 1번: Base AI Agent 개선 결과
 
-> 발표 자료(18쪽 PDF): [`presentation.pdf`](presentation.pdf)
+> 발표 자료(18쪽): [`presentation.md`](presentation.md)(웹에서 바로 보기) · [`presentation.pdf`](presentation.pdf)(PDF)
 
 원본 `all_total_vue_student`(운영 인시던트 대응 에이전트)를 실행·측정해 찾은 문제를 고치고 기능을 추가했다.
 같은 입력 9개로 개선 전/후를 실측했다.
