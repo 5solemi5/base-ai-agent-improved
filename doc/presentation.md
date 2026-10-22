@@ -1,6 +1,6 @@
 # 과제 1번 발표 자료 — 운영 인시던트 대응 에이전트 개선
 
-최은주 · 18쪽 · PDF로 받기: [`presentation.pdf`](presentation.pdf) · 글로 된 결과 보고서: [`IMPROVEMENTS.md`](IMPROVEMENTS.md)
+G102 · 최은주 · 18쪽 · PDF로 받기: [`presentation.pdf`](presentation.pdf) · 글로 된 결과 보고서: [`IMPROVEMENTS.md`](IMPROVEMENTS.md)
 
 ## 1. 표지
 
