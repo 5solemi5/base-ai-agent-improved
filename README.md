@@ -4,6 +4,7 @@ AI 서비스 Mini-Project **과제 1번**. 제공된 Base AI Agent(`all_total_vu
 같은 질문 9개로 개선 전/후를 실측했다.
 
 - **결과 보고서 (문제 → 개선 → Before/After → 한계):** [`doc/IMPROVEMENTS.md`](doc/IMPROVEMENTS.md)
+- **발표 자료 (18쪽 PDF):** [`doc/presentation.pdf`](doc/presentation.pdf) — 1\~10쪽 기능·결과, 11쪽 그래프 구성, 12\~14쪽 한계·느낀점, 15\~18쪽 부록(코드)
 - **원래 사용 설명서:** [`doc/README.md`](doc/README.md)
 - **로컬로 만들고 OpenAI로 다듬기 + LangSmith 추적:** 보고서 [2-1절](doc/IMPROVEMENTS.md#2-1-로컬로-만들고-openai로-다듬기-개선-15--langsmith-추적) — 같은 9개 질문에서 정확도는 그대로, 장애 질문 소요 50.0초 → 26.1초
 
